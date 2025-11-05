@@ -19,12 +19,6 @@ public class Repository
         _config = config;
     }
 
-    public async Task InitializeAsync()
-    {
-        await _dbContext.CreateTableAsync();
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Table created with typed columns (TEXT, INTEGER, BIGINT, NUMERIC)");
-    }
-
     public async Task<(bool Success, string FileName)> UploadFileAsync(string filePath, int fileNum, int totalFiles)
     {
         try
@@ -41,20 +35,6 @@ public class Repository
             }
             return (false, Path.GetFileName(filePath));
         }
-    }
-
-    public async Task<long> UploadFirstFileAsync(string filePath)
-    {
-        await using var conn = await _dbContext.OpenConnectionAsync();
-        var (rowCount, _) = await UploadFileInternalAsync(conn, filePath, 1, 1);
-
-        lock (_progressLock)
-        {
-            _totalRowsUploaded = rowCount;
-            _successfulUploads = 1;
-        }
-
-        return rowCount;
     }
 
     private async Task<(long RowCount, double Duration)> UploadFileInternalAsync(
