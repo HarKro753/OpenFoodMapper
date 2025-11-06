@@ -4,7 +4,7 @@ public class Product
 {
     public static readonly (string Name, string Type)[] Columns = {
         // Basic info
-        ("code", "BIGINT"), ("url", "TEXT"), ("creator", "TEXT"),
+        ("code", "NUMERIC"), ("url", "TEXT"), ("creator", "TEXT"),
         ("created_t", "BIGINT"), ("created_datetime", "TEXT"),
         ("last_modified_t", "BIGINT"), ("last_modified_datetime", "TEXT"),
         ("last_modified_by", "TEXT"),
