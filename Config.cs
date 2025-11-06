@@ -8,7 +8,7 @@ public class Config
     public string DbUser { get; set; } = "myuser";
     public string DbPassword { get; set; } = "1234";
     public int MaxWorkers { get; set; } = 16;
-    public int MaxFiles { get; set; } = 1; // 0 means unlimited
+    public int MaxFiles { get; set; } = 5; // 0 means unlimited
     public string DataFolder { get; set; } = "Food";
 
     public string GetConnectionString() =>

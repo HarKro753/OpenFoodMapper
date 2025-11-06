@@ -42,18 +42,13 @@ public class DatabaseContext
             await cmd.ExecuteNonQueryAsync();
         }
 
-        await using (var cmd = new NpgsqlCommand("CREATE INDEX idx_categories_name ON categories(\"name\");", conn))
-        {
-            await cmd.ExecuteNonQueryAsync();
-        }
-
         var productCategoryColumnDefs = string.Join(", ", ProductCategory.Columns.Select(c => $"\"{c.Name}\" {c.Type}"));
         await using (var cmd = new NpgsqlCommand($"CREATE TABLE product_categories ({productCategoryColumnDefs}, PRIMARY KEY (\"product_code\", \"category_id\"), FOREIGN KEY (\"product_code\") REFERENCES products(\"code\") ON DELETE CASCADE, FOREIGN KEY (\"category_id\") REFERENCES categories(\"id\") ON DELETE CASCADE);", conn))
         {
             await cmd.ExecuteNonQueryAsync();
         }
 
-        await using (var cmd = new NpgsqlCommand("CREATE INDEX idx_product_categories_product ON product_categories(\"product_code\"); CREATE INDEX idx_product_categories_category ON product_categories(\"category_id\");", conn))
+        await using (var cmd = new NpgsqlCommand("CREATE INDEX idx_product_categories_category ON product_categories(\"category_id\");", conn))
         {
             await cmd.ExecuteNonQueryAsync();
         }
