@@ -1,4 +1,4 @@
-namespace OpenFood;
+namespace OpenFood.Models;
 
 public class Product
 {
