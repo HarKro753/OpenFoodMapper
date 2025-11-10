@@ -13,8 +13,10 @@ public class Repository
     private readonly object _progressLock = new();
     private long _totalRowsUploaded = 0;
     private int _successfulUploads = 0;
-    private readonly Dictionary<(string Name, int? ParentId), int> _categoryCache = new();
+    private readonly Dictionary<string, int> _categoryCache = new();
     private readonly object _categoryCacheLock = new();
+    private readonly Dictionary<string, int> _additiveCache = new();
+    private readonly object _additiveCacheLock = new();
 
     public Repository(DatabaseContext dbContext, Config config)
     {
@@ -74,39 +76,67 @@ public class Repository
         }
 
         var copyCommand = $"COPY {tempTableName} ({string.Join(", ", productColumnNames.Select(c => $"\"{c}\""))}) FROM STDIN (FORMAT TEXT, DELIMITER E'\\t', NULL '\\N')";
-        var productCategoriesRaw = new List<(long ProductCode, string CategoriesEn)>();
+        var productCategoriesRaw = new List<(string ProductCode, string CategoriesEn)>();
+        var productAdditivesRaw = new List<(string ProductCode, string AdditivesEn)>();
 
         await using (var writer = await conn.BeginTextImportAsync(copyCommand))
         {
             using var reader = new StreamReader(filePath);
             using var csv = new CsvReader(reader, config);
 
-            var categoriesEnIndex = Array.IndexOf(Product.ColumnNames, "categories_en");
-            var codeIndex = Array.IndexOf(Product.ColumnNames, "code");
+            // Use CsvSchema.AllColumns to get correct indices from the CSV file
+            var categoriesEnIndex = Array.IndexOf(CsvSchema.AllColumns, "categories_en");
+            var additivesEnIndex = Array.IndexOf(CsvSchema.AllColumns, "additives_en");
+            var codeIndex = Array.IndexOf(CsvSchema.AllColumns, "code");
+
+            // Create a mapping from Product columns to CSV indices
+            var productColumnIndices = new Dictionary<string, int>();
+            foreach (var col in Product.ColumnNames)
+            {
+                if (!excludedColumns.Contains(col))
+                {
+                    productColumnIndices[col] = Array.IndexOf(CsvSchema.AllColumns, col);
+                }
+            }
 
             while (await csv.ReadAsync())
             {
                 var values = new List<string>();
-                long? productCode = null;
+                string? productCode = null;
                 string? categoriesEn = null;
+                string? additivesEn = null;
 
-                for (int i = 0; i < Product.ColumnNames.Length; i++)
+                // Read special columns for relations
+                if (categoriesEnIndex >= 0)
                 {
-                    var value = csv.GetField(i);
-                    var columnName = Product.ColumnNames[i];
-
-                    if (i == categoriesEnIndex && !string.IsNullOrWhiteSpace(value) && value != "N")
+                    var value = csv.GetField(categoriesEnIndex);
+                    if (!string.IsNullOrWhiteSpace(value) && value != "N")
                     {
                         categoriesEn = value;
                     }
-                    if (i == codeIndex && !string.IsNullOrEmpty(value) && value != "N")
+                }
+                if (additivesEnIndex >= 0)
+                {
+                    var value = csv.GetField(additivesEnIndex);
+                    if (!string.IsNullOrWhiteSpace(value) && value != "N")
                     {
-                        if (long.TryParse(value, out var code))
-                            productCode = code;
+                        additivesEn = value;
                     }
+                }
+                if (codeIndex >= 0)
+                {
+                    var value = csv.GetField(codeIndex);
+                    if (!string.IsNullOrEmpty(value) && value != "N")
+                    {
+                        productCode = value;
+                    }
+                }
 
-                    if (excludedColumns.Contains(columnName))
-                        continue;
+                // Read only the columns we want to store, in the correct order
+                foreach (var colName in productColumnNames)
+                {
+                    var csvIndex = productColumnIndices[colName];
+                    var value = csv.GetField(csvIndex);
 
                     if (string.IsNullOrEmpty(value) || value == "N")
                     {
@@ -125,20 +155,34 @@ public class Repository
                 await writer.WriteLineAsync(string.Join("\t", values));
                 rowCount++;
 
-                if (productCode.HasValue && !string.IsNullOrWhiteSpace(categoriesEn))
+                if (!string.IsNullOrWhiteSpace(productCode) && !string.IsNullOrWhiteSpace(categoriesEn))
                 {
-                    productCategoriesRaw.Add((productCode.Value, categoriesEn));
+                    productCategoriesRaw.Add((productCode, categoriesEn));
+                }
+                if (!string.IsNullOrWhiteSpace(productCode) && !string.IsNullOrWhiteSpace(additivesEn))
+                {
+                    productAdditivesRaw.Add((productCode, additivesEn));
                 }
             }
         }
 
-        var productCategories = new List<(long ProductCode, int CategoryId)>();
+        var productCategories = new List<(string ProductCode, int CategoryId)>();
         foreach (var (productCode, categoriesEn) in productCategoriesRaw)
         {
             var categoryId = await ProcessCategoryHierarchyAsync(conn, categoriesEn);
             if (categoryId.HasValue)
             {
                 productCategories.Add((productCode, categoryId.Value));
+            }
+        }
+
+        var productAdditives = new List<(string ProductCode, int AdditiveId)>();
+        foreach (var (productCode, additivesEn) in productAdditivesRaw)
+        {
+            var additiveIds = await ProcessAdditivesAsync(conn, additivesEn);
+            foreach (var additiveId in additiveIds)
+            {
+                productAdditives.Add((productCode, additiveId));
             }
         }
 
@@ -154,10 +198,23 @@ public class Repository
             foreach (var (productCode, categoryId) in productCategories)
             {
                 await using var cmd = new NpgsqlCommand(
-                    "INSERT INTO product_categories (\"product_code\", \"category_id\") VALUES (@code, @catId) ON CONFLICT DO NOTHING",
+                    "INSERT INTO product_categories (\"product_code\", \"category_id\") VALUES (@code::NUMERIC, @catId) ON CONFLICT DO NOTHING",
                     conn);
                 cmd.Parameters.AddWithValue("code", productCode);
                 cmd.Parameters.AddWithValue("catId", categoryId);
+                await cmd.ExecuteNonQueryAsync();
+            }
+        }
+
+        if (productAdditives.Count > 0)
+        {
+            foreach (var (productCode, additiveId) in productAdditives)
+            {
+                await using var cmd = new NpgsqlCommand(
+                    "INSERT INTO product_additives (\"product_code\", \"additive_id\") VALUES (@code::NUMERIC, @addId) ON CONFLICT DO NOTHING",
+                    conn);
+                cmd.Parameters.AddWithValue("code", productCode);
+                cmd.Parameters.AddWithValue("addId", additiveId);
                 await cmd.ExecuteNonQueryAsync();
             }
         }
@@ -168,7 +225,7 @@ public class Repository
         {
             _totalRowsUploaded += rowCount;
             _successfulUploads++;
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [{fileInfo.Name}] Loaded {rowCount:N0} rows, {productCategories.Count:N0} category mappings");
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] [{fileInfo.Name}] Loaded {rowCount:N0} rows, {productCategories.Count:N0} category mappings, {productAdditives.Count:N0} additive mappings");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}]  [{fileInfo.Name}] Uploaded successfully in {duration:F1}s");
             Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Progress: {_successfulUploads}/{totalFiles} files | {_totalRowsUploaded:N0} total rows");
         }
@@ -199,44 +256,45 @@ public class Repository
         if (categoryNames.Length == 0)
             return null;
 
-        int? parentId = null;
-        int? leafCategoryId = null;
+        var broadestCategory = categoryNames[0].Trim();
 
-        foreach (var categoryName in categoryNames)
-        {
-            var trimmedName = categoryName.Trim();
+        if (string.IsNullOrWhiteSpace(broadestCategory))
+            return null;
 
-            if (string.IsNullOrWhiteSpace(trimmedName))
-                continue;
+        var cleanedName = CleanCategoryName(broadestCategory);
 
-            var categoryId = await GetOrCreateCategoryAsync(conn, trimmedName, parentId);
-            leafCategoryId = categoryId;
+        if (string.IsNullOrWhiteSpace(cleanedName))
+            return null;
 
-            parentId = categoryId;
-        }
-
-        return leafCategoryId;
+        var categoryId = await GetOrCreateCategoryAsync(conn, cleanedName);
+        return categoryId;
     }
 
-    private async Task<int> GetOrCreateCategoryAsync(NpgsqlConnection conn, string name, int? parentId)
+    private string CleanCategoryName(string name)
     {
-        var cacheKey = (name, parentId);
+        if (name.Length > 3 && name[2] == ':')
+        {
+            name = name.Substring(3);
+        }
 
+        name = name.Replace('-', ' ');
+
+        return name.Trim();
+    }
+
+    private async Task<int> GetOrCreateCategoryAsync(NpgsqlConnection conn, string name)
+    {
         lock (_categoryCacheLock)
         {
-            if (_categoryCache.TryGetValue(cacheKey, out var cachedId))
+            if (_categoryCache.TryGetValue(name, out var cachedId))
                 return cachedId;
         }
 
-        var selectSql = parentId.HasValue
-            ? "SELECT \"id\" FROM categories WHERE \"name\" = @name AND \"parent_id\" = @parentId"
-            : "SELECT \"id\" FROM categories WHERE \"name\" = @name AND \"parent_id\" IS NULL";
+        var selectSql = "SELECT \"id\" FROM categories WHERE \"name\" = @name";
 
         await using (var cmd = new NpgsqlCommand(selectSql, conn))
         {
             cmd.Parameters.AddWithValue("name", name);
-            if (parentId.HasValue)
-                cmd.Parameters.AddWithValue("parentId", parentId.Value);
 
             var result = await cmd.ExecuteScalarAsync();
             if (result != null)
@@ -244,26 +302,82 @@ public class Repository
                 var id = Convert.ToInt32(result);
                 lock (_categoryCacheLock)
                 {
-                    _categoryCache[cacheKey] = id;
+                    _categoryCache[name] = id;
                 }
                 return id;
             }
         }
 
-        var insertSql = parentId.HasValue
-            ? "INSERT INTO categories (\"name\", \"parent_id\") VALUES (@name, @parentId) RETURNING \"id\""
-            : "INSERT INTO categories (\"name\", \"parent_id\") VALUES (@name, NULL) RETURNING \"id\"";
+        var insertSql = "INSERT INTO categories (\"name\") VALUES (@name) ON CONFLICT (\"name\") DO UPDATE SET \"name\" = EXCLUDED.\"name\" RETURNING \"id\"";
 
         await using (var cmd = new NpgsqlCommand(insertSql, conn))
         {
             cmd.Parameters.AddWithValue("name", name);
-            if (parentId.HasValue)
-                cmd.Parameters.AddWithValue("parentId", parentId.Value);
 
             var newId = Convert.ToInt32(await cmd.ExecuteScalarAsync() ?? throw new Exception("Failed to insert category"));
             lock (_categoryCacheLock)
             {
-                _categoryCache[cacheKey] = newId;
+                _categoryCache[name] = newId;
+            }
+            return newId;
+        }
+    }
+
+    private async Task<List<int>> ProcessAdditivesAsync(NpgsqlConnection conn, string additivesEn)
+    {
+        var additiveIds = new List<int>();
+        var additiveNames = additivesEn.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        foreach (var additiveName in additiveNames)
+        {
+            var trimmedName = additiveName.Trim();
+
+            if (string.IsNullOrWhiteSpace(trimmedName))
+                continue;
+
+            var additiveId = await GetOrCreateAdditiveAsync(conn, trimmedName);
+            additiveIds.Add(additiveId);
+        }
+
+        return additiveIds;
+    }
+
+    private async Task<int> GetOrCreateAdditiveAsync(NpgsqlConnection conn, string name)
+    {
+        lock (_additiveCacheLock)
+        {
+            if (_additiveCache.TryGetValue(name, out var cachedId))
+                return cachedId;
+        }
+
+        var selectSql = "SELECT \"id\" FROM additives WHERE \"name\" = @name";
+
+        await using (var cmd = new NpgsqlCommand(selectSql, conn))
+        {
+            cmd.Parameters.AddWithValue("name", name);
+
+            var result = await cmd.ExecuteScalarAsync();
+            if (result != null)
+            {
+                var id = Convert.ToInt32(result);
+                lock (_additiveCacheLock)
+                {
+                    _additiveCache[name] = id;
+                }
+                return id;
+            }
+        }
+
+        var insertSql = "INSERT INTO additives (\"name\") VALUES (@name) ON CONFLICT (\"name\") DO UPDATE SET \"name\" = EXCLUDED.\"name\" RETURNING \"id\"";
+
+        await using (var cmd = new NpgsqlCommand(insertSql, conn))
+        {
+            cmd.Parameters.AddWithValue("name", name);
+
+            var newId = Convert.ToInt32(await cmd.ExecuteScalarAsync() ?? throw new Exception("Failed to insert additive"));
+            lock (_additiveCacheLock)
+            {
+                _additiveCache[name] = newId;
             }
             return newId;
         }

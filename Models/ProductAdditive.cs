@@ -1,10 +1,10 @@
 namespace OpenFood.Models;
 
-public class Category
+public class ProductAdditive
 {
     public static readonly (string Name, string Type)[] Columns = {
-        ("id", "SERIAL PRIMARY KEY"),
-        ("name", "TEXT NOT NULL UNIQUE")
+        ("product_code", "NUMERIC NOT NULL"),
+        ("additive_id", "INTEGER NOT NULL")
     };
 
     public static string[] ColumnNames => Columns.Select(c => c.Name).ToArray();

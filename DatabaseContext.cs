@@ -23,7 +23,7 @@ public class DatabaseContext
     {
         await using var conn = await OpenConnectionAsync();
 
-        await using (var cmd = new NpgsqlCommand("DROP TABLE IF EXISTS product_categories CASCADE; DROP TABLE IF EXISTS categories CASCADE; DROP TABLE IF EXISTS products CASCADE;", conn))
+        await using (var cmd = new NpgsqlCommand("DROP TABLE IF EXISTS product_additives CASCADE; DROP TABLE IF EXISTS additives CASCADE; DROP TABLE IF EXISTS product_categories CASCADE; DROP TABLE IF EXISTS categories CASCADE; DROP TABLE IF EXISTS products CASCADE;", conn))
         {
             await cmd.ExecuteNonQueryAsync();
         }
@@ -37,7 +37,13 @@ public class DatabaseContext
         }
 
         var categoryColumnDefs = string.Join(", ", Category.Columns.Select(c => $"\"{c.Name}\" {c.Type}"));
-        await using (var cmd = new NpgsqlCommand($"CREATE TABLE categories ({categoryColumnDefs}, FOREIGN KEY (\"parent_id\") REFERENCES categories(\"id\") ON DELETE CASCADE, UNIQUE(\"name\", \"parent_id\"));", conn))
+        await using (var cmd = new NpgsqlCommand($"CREATE TABLE categories ({categoryColumnDefs});", conn))
+        {
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        var additiveColumnDefs = string.Join(", ", Additive.Columns.Select(c => $"\"{c.Name}\" {c.Type}"));
+        await using (var cmd = new NpgsqlCommand($"CREATE TABLE additives ({additiveColumnDefs});", conn))
         {
             await cmd.ExecuteNonQueryAsync();
         }
@@ -48,7 +54,18 @@ public class DatabaseContext
             await cmd.ExecuteNonQueryAsync();
         }
 
+        var productAdditiveColumnDefs = string.Join(", ", ProductAdditive.Columns.Select(c => $"\"{c.Name}\" {c.Type}"));
+        await using (var cmd = new NpgsqlCommand($"CREATE TABLE product_additives ({productAdditiveColumnDefs}, PRIMARY KEY (\"product_code\", \"additive_id\"), FOREIGN KEY (\"product_code\") REFERENCES products(\"code\") ON DELETE CASCADE, FOREIGN KEY (\"additive_id\") REFERENCES additives(\"id\") ON DELETE CASCADE);", conn))
+        {
+            await cmd.ExecuteNonQueryAsync();
+        }
+
         await using (var cmd = new NpgsqlCommand("CREATE INDEX idx_product_categories_category ON product_categories(\"category_id\");", conn))
+        {
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        await using (var cmd = new NpgsqlCommand("CREATE INDEX idx_product_additives_additive ON product_additives(\"additive_id\");", conn))
         {
             await cmd.ExecuteNonQueryAsync();
         }

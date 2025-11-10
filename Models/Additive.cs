@@ -1,6 +1,6 @@
 namespace OpenFood.Models;
 
-public class Category
+public class Additive
 {
     public static readonly (string Name, string Type)[] Columns = {
         ("id", "SERIAL PRIMARY KEY"),

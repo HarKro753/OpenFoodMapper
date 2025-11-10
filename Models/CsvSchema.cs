@@ -1,0 +1,159 @@
+namespace OpenFood.Models;
+
+public static class CsvSchema
+{
+    // This represents ALL columns in the CSV file in their original order
+    // We need this to correctly read the CSV even though we only store some columns
+    public static readonly string[] AllColumns = {
+        // Basic info
+        "code", "url", "creator",
+        "created_t", "created_datetime",
+        "last_modified_t", "last_modified_datetime",
+        "last_modified_by",
+        "last_updated_t", "last_updated_datetime",
+
+        // Product details
+        "product_name", "abbreviated_product_name",
+        "generic_name", "quantity",
+
+        // Packaging
+        "packaging", "packaging_tags", "packaging_en", "packaging_text",
+
+        // Brands
+        "brands", "brands_tags", "brands_en",
+
+        // Categories
+        "categories", "categories_tags", "categories_en",
+
+        // Origins
+        "origins", "origins_tags", "origins_en",
+
+        // Manufacturing
+        "manufacturing_places", "manufacturing_places_tags",
+
+        // Labels
+        "labels", "labels_tags", "labels_en",
+
+        // Codes
+        "emb_codes", "emb_codes_tags", "first_packaging_code_geo",
+
+        // Places
+        "cities", "cities_tags", "purchase_places",
+        "stores", "countries", "countries_tags", "countries_en",
+
+        // Ingredients
+        "ingredients_text", "ingredients_tags",
+        "ingredients_analysis_tags",
+
+        // Allergens
+        "allergens", "allergens_en",
+        "traces", "traces_tags", "traces_en",
+
+        // Serving
+        "serving_size", "serving_quantity", "no_nutrition_data",
+
+        // Additives
+        "additives_n", "additives", "additives_tags", "additives_en",
+
+        // Scores
+        "nutriscore_score", "nutriscore_grade", "nova_group",
+        "pnns_groups_1", "pnns_groups_2",
+
+        // Food groups
+        "food_groups", "food_groups_tags", "food_groups_en",
+
+        // States
+        "states", "states_tags", "states_en",
+
+        // Owner
+        "brand_owner",
+
+        // Environmental
+        "environmental_score_score", "environmental_score_grade",
+
+        // Quality
+        "nutrient_levels_tags", "product_quantity",
+        "owner", "data_quality_errors_tags",
+
+        // Popularity
+        "unique_scans_n", "popularity_tags",
+        "completeness",
+
+        // Images
+        "last_image_t", "last_image_datetime",
+        "main_category", "main_category_en",
+        "image_url", "image_small_url",
+        "image_ingredients_url", "image_ingredients_small_url",
+        "image_nutrition_url", "image_nutrition_small_url",
+
+        // Nutrition - Energy
+        "energy-kj_100g", "energy-kcal_100g", "energy_100g",
+        "energy-from-fat_100g",
+
+        // Nutrition - Fats
+        "fat_100g", "saturated-fat_100g",
+        "butyric-acid_100g", "caproic-acid_100g", "caprylic-acid_100g",
+        "capric-acid_100g", "lauric-acid_100g", "myristic-acid_100g",
+        "palmitic-acid_100g", "stearic-acid_100g", "arachidic-acid_100g",
+        "behenic-acid_100g", "lignoceric-acid_100g", "cerotic-acid_100g",
+        "montanic-acid_100g", "melissic-acid_100g",
+        "unsaturated-fat_100g", "monounsaturated-fat_100g", "omega-9-fat_100g",
+        "polyunsaturated-fat_100g", "omega-3-fat_100g", "omega-6-fat_100g",
+        "alpha-linolenic-acid_100g", "eicosapentaenoic-acid_100g",
+        "docosahexaenoic-acid_100g", "linoleic-acid_100g", "arachidonic-acid_100g",
+        "gamma-linolenic-acid_100g", "dihomo-gamma-linolenic-acid_100g",
+        "oleic-acid_100g", "elaidic-acid_100g", "gondoic-acid_100g",
+        "mead-acid_100g", "erucic-acid_100g", "nervonic-acid_100g",
+        "trans-fat_100g", "cholesterol_100g",
+
+        // Nutrition - Carbohydrates
+        "carbohydrates_100g", "sugars_100g", "added-sugars_100g",
+        "sucrose_100g", "glucose_100g", "fructose_100g",
+        "galactose_100g", "lactose_100g", "maltose_100g",
+        "maltodextrins_100g", "psicose_100g", "starch_100g",
+        "polyols_100g", "erythritol_100g", "isomalt_100g",
+        "maltitol_100g", "sorbitol_100g",
+
+        // Nutrition - Fiber & Proteins
+        "fiber_100g", "soluble-fiber_100g", "insoluble-fiber_100g",
+        "proteins_100g", "casein_100g", "serum-proteins_100g",
+        "nucleotides_100g",
+
+        // Nutrition - Salt & Sodium
+        "salt_100g", "added-salt_100g", "sodium_100g",
+        "alcohol_100g",
+
+        // Nutrition - Vitamins
+        "vitamin-a_100g", "beta-carotene_100g", "vitamin-d_100g",
+        "vitamin-e_100g", "vitamin-k_100g", "vitamin-c_100g",
+        "vitamin-b1_100g", "vitamin-b2_100g", "vitamin-pp_100g",
+        "vitamin-b6_100g", "vitamin-b9_100g", "folates_100g",
+        "vitamin-b12_100g", "biotin_100g", "pantothenic-acid_100g",
+
+        // Nutrition - Minerals
+        "silica_100g", "bicarbonate_100g", "potassium_100g",
+        "chloride_100g", "calcium_100g", "phosphorus_100g",
+        "iron_100g", "magnesium_100g", "zinc_100g",
+        "copper_100g", "manganese_100g", "fluoride_100g",
+        "selenium_100g", "chromium_100g", "molybdenum_100g",
+        "iodine_100g",
+
+        // Nutrition - Other
+        "caffeine_100g", "taurine_100g",
+        "methylsulfonylmethane_100g", "ph_100g",
+
+        // Nutrition - Fruits/Vegetables
+        "fruits-vegetables-nuts_100g", "fruits-vegetables-nuts-dried_100g",
+        "fruits-vegetables-nuts-estimate_100g",
+        "fruits-vegetables-nuts-estimate-from-ingredients_100g",
+
+        // Nutrition - Misc
+        "collagen-meat-protein-ratio_100g", "cocoa_100g", "chlorophyl_100g",
+        "carbon-footprint_100g", "carbon-footprint-from-meat-or-fish_100g",
+        "nutrition-score-fr_100g", "nutrition-score-uk_100g",
+        "glycemic-index_100g", "water-hardness_100g", "choline_100g",
+        "phylloquinone_100g", "beta-glucan_100g",
+        "inositol_100g", "carnitine_100g", "sulphate_100g",
+        "nitrate_100g", "acidity_100g", "carbohydrates-total_100g"
+    };
+}
