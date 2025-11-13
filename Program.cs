@@ -99,7 +99,7 @@ class Program
 
         try
         {
-            var updates = new List<(decimal code, string? categoriesEn)>();
+            var updates = new List<(decimal code, string? countries)>();
 
             // Read the CSV file
             using (var reader = new StreamReader(csvFile))
@@ -117,9 +117,9 @@ class Program
                 {
                     try
                     {
-                        // Index 0 is code, index 23 is categories_en according to CsvSchema.cs
+                        // Index 0 is code, index 23 is categories_en, index 39 is countries according to CsvSchema.cs
                         var codeStr = csv.GetField(0);
-                        var categoriesEn = csv.GetField(23);
+                        var countries = csv.GetField(39);
 
                         if (string.IsNullOrWhiteSpace(codeStr))
                         {
@@ -133,10 +133,10 @@ class Program
                             continue;
                         }
 
-                        // Only add if categories_en has a value
-                        if (!string.IsNullOrWhiteSpace(categoriesEn))
+                        // Only add if at least one field has a value
+                        if (!string.IsNullOrWhiteSpace(countries))
                         {
-                            updates.Add((code, categoriesEn));
+                            updates.Add((code, countries));
                         }
                         else
                         {
@@ -164,12 +164,15 @@ class Program
 
                     using var context = new DatabaseContext(optionsBuilder.Options);
 
-                    foreach (var (code, categoriesEn) in batch)
+                    foreach (var (code, countries) in batch)
                     {
                         var product = await context.Products.FindAsync(code);
                         if (product != null)
                         {
-                            product.CategoriesEn = categoriesEn;
+                            if (!string.IsNullOrWhiteSpace(countries))
+                            {
+                                product.Countries = countries;
+                            }
                             updated++;
                         }
                         else

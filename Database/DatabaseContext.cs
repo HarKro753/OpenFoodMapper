@@ -57,6 +57,7 @@ public class DatabaseContext : DbContext
             entity.Property(e => e.Zinc100g).HasColumnName("zinc_100g");
             entity.Property(e => e.Potassium100g).HasColumnName("potassium_100g");
             entity.Property(e => e.CategoriesEn).HasColumnName("categories_en");
+            entity.Property(e => e.Countries).HasColumnName("countries");
         });
 
         modelBuilder.Entity<Category>(entity =>

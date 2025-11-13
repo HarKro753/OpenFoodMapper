@@ -37,6 +37,7 @@ public class Product
     public decimal? Zinc100g { get; set; }
     public decimal? Potassium100g { get; set; }
     public string? CategoriesEn { get; set; }
+    public string? Countries { get; set; }
 
     public ICollection<ProductCategory> ProductCategories { get; set; } = new List<ProductCategory>();
 }
