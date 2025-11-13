@@ -8,6 +8,8 @@ public class DatabaseContext : DbContext
     public DbSet<Product> Products { get; set; }
     public DbSet<Category> Categories { get; set; }
     public DbSet<ProductCategory> ProductCategories { get; set; }
+    public DbSet<Country> Countries { get; set; }
+    public DbSet<ProductCountry> ProductCountries { get; set; }
 
     public DatabaseContext(DbContextOptions<DatabaseContext> options) : base(options)
     {
@@ -91,6 +93,39 @@ public class DatabaseContext : DbContext
 
             entity.HasIndex(pc => pc.CategoryId)
                 .HasDatabaseName("idx_product_categories_category");
+        });
+
+        modelBuilder.Entity<Country>(entity =>
+        {
+            entity.ToTable("countries");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").IsRequired();
+
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductCountry>(entity =>
+        {
+            entity.ToTable("product_countries");
+            entity.HasKey(pc => new { pc.ProductCode, pc.CountryId });
+
+            entity.Property(e => e.ProductCode).HasColumnName("product_code");
+            entity.Property(e => e.CountryId).HasColumnName("country_id");
+
+            entity.HasOne(pc => pc.Product)
+                .WithMany(p => p.ProductCountries)
+                .HasForeignKey(pc => pc.ProductCode)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(pc => pc.Country)
+                .WithMany(c => c.ProductCountries)
+                .HasForeignKey(pc => pc.CountryId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(pc => pc.CountryId)
+                .HasDatabaseName("idx_product_countries_country");
         });
     }
 }

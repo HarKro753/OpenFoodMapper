@@ -40,4 +40,5 @@ public class Product
     public string? Countries { get; set; }
 
     public ICollection<ProductCategory> ProductCategories { get; set; } = new List<ProductCategory>();
+    public ICollection<ProductCountry> ProductCountries { get; set; } = new List<ProductCountry>();
 }

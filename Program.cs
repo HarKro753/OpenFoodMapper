@@ -13,7 +13,7 @@ class Program
         var config = new Config();
         var connectionString = config.GetConnectionString();
 
-        var csvFiles = GetCsvFilePaths();
+        var csvFiles = Tools.GetCsvFilePaths();
         Console.WriteLine($"Found {csvFiles.Count} CSV files to process");
 
         // Process files concurrently
@@ -59,34 +59,7 @@ class Program
         Console.WriteLine($"Total errors: {totalErrors}");
     }
 
-    static List<string> GetCsvFilePaths()
-    {
-        var files = new List<string>();
-        var directory = Directory.GetCurrentDirectory();
-        var foodDirectory = Path.Combine(directory, "Food");
-
-        // Generate file names from part_aa to part_bp
-        for (char first = 'a'; first <= 'b'; first++)
-        {
-            var endChar = first == 'a' ? 'z' : 'p';
-            for (char second = 'a'; second <= endChar; second++)
-            {
-                var fileName = $"part_{first}{second}";
-                var filePath = Path.Combine(foodDirectory, fileName);
-
-                if (File.Exists(filePath))
-                {
-                    files.Add(filePath);
-                }
-                else
-                {
-                    Console.WriteLine($"Warning: File not found: {filePath}");
-                }
-            }
-        }
-
-        return files;
-    }
+    
 
     static async Task<(int updated, int skipped, int errors)> ProcessCsvFile(string csvFile, string connectionString)
     {
@@ -99,7 +72,7 @@ class Program
 
         try
         {
-            var updates = new List<(decimal code, string? countries)>();
+            var updates = new List<(decimal code, string? categoriesEn, string? countries)>();
 
             // Read the CSV file
             using (var reader = new StreamReader(csvFile))
@@ -119,6 +92,7 @@ class Program
                     {
                         // Index 0 is code, index 23 is categories_en, index 39 is countries according to CsvSchema.cs
                         var codeStr = csv.GetField(0);
+                        var categoriesEn = csv.GetField(23);
                         var countries = csv.GetField(39);
 
                         if (string.IsNullOrWhiteSpace(codeStr))
@@ -134,9 +108,9 @@ class Program
                         }
 
                         // Only add if at least one field has a value
-                        if (!string.IsNullOrWhiteSpace(countries))
+                        if (!string.IsNullOrWhiteSpace(categoriesEn) || !string.IsNullOrWhiteSpace(countries))
                         {
-                            updates.Add((code, countries));
+                            updates.Add((code, categoriesEn, countries));
                         }
                         else
                         {
@@ -154,7 +128,7 @@ class Program
             // Batch update the database
             if (updates.Count > 0)
             {
-                var batchSize = 1000;
+                var batchSize = 500;
                 for (int i = 0; i < updates.Count; i += batchSize)
                 {
                     var batch = updates.Skip(i).Take(batchSize).ToList();
@@ -164,21 +138,95 @@ class Program
 
                     using var context = new DatabaseContext(optionsBuilder.Options);
 
-                    foreach (var (code, countries) in batch)
+                    // Track relationships we're adding in this batch to avoid duplicates
+                    var addedProductCategories = new HashSet<(decimal, int)>();
+                    var addedProductCountries = new HashSet<(decimal, int)>();
+
+                    foreach (var (code, categoriesEn, countries) in batch)
                     {
                         var product = await context.Products.FindAsync(code);
-                        if (product != null)
-                        {
-                            if (!string.IsNullOrWhiteSpace(countries))
-                            {
-                                product.Countries = countries;
-                            }
-                            updated++;
-                        }
-                        else
+                        if (product == null)
                         {
                             skipped++;
+                            continue;
                         }
+
+                        // Update the raw columns
+                        if (!string.IsNullOrWhiteSpace(categoriesEn))
+                        {
+                            product.CategoriesEn = categoriesEn;
+
+                            // Parse and insert categories (deduplicate within the product)
+                            var categoryNames = Tools.ParseCommaSeparatedValues(categoriesEn).Distinct().ToList();
+                            foreach (var categoryName in categoryNames)
+                            {
+                                var category = await context.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Name == categoryName);
+                                if (category == null)
+                                {
+                                    category = new Database.Models.Category { Name = categoryName };
+                                    context.Categories.Add(category);
+                                    await context.SaveChangesAsync(); // Save to get the ID
+                                    context.Entry(category).State = EntityState.Detached; // Detach to avoid tracking issues
+                                }
+
+                                // Check if relationship already exists in DB or in current batch
+                                var relationKey = (code, category.Id);
+                                if (!addedProductCategories.Contains(relationKey))
+                                {
+                                    var existingRelation = await context.ProductCategories.AsNoTracking()
+                                        .AnyAsync(pc => pc.ProductCode == code && pc.CategoryId == category.Id);
+
+                                    if (!existingRelation)
+                                    {
+                                        context.ProductCategories.Add(new Database.Models.ProductCategory
+                                        {
+                                            ProductCode = code,
+                                            CategoryId = category.Id
+                                        });
+                                        addedProductCategories.Add(relationKey);
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(countries))
+                        {
+                            product.Countries = countries;
+
+                            // Parse and insert countries (deduplicate within the product)
+                            var countryNames = Tools.ParseCommaSeparatedValues(countries).Distinct().ToList();
+                            foreach (var countryName in countryNames)
+                            {
+                                var country = await context.Countries.AsNoTracking().FirstOrDefaultAsync(c => c.Name == countryName);
+                                if (country == null)
+                                {
+                                    country = new Database.Models.Country { Name = countryName };
+                                    context.Countries.Add(country);
+                                    await context.SaveChangesAsync(); // Save to get the ID
+                                    context.Entry(country).State = EntityState.Detached; // Detach to avoid tracking issues
+                                }
+
+                                // Check if relationship already exists in DB or in current batch
+                                var relationKey = (code, country.Id);
+                                if (!addedProductCountries.Contains(relationKey))
+                                {
+                                    var existingRelation = await context.ProductCountries.AsNoTracking()
+                                        .AnyAsync(pc => pc.ProductCode == code && pc.CountryId == country.Id);
+
+                                    if (!existingRelation)
+                                    {
+                                        context.ProductCountries.Add(new Database.Models.ProductCountry
+                                        {
+                                            ProductCode = code,
+                                            CountryId = country.Id
+                                        });
+                                        addedProductCountries.Add(relationKey);
+                                    }
+                                }
+                            }
+                        }
+
+                        updated++;
                     }
 
                     await context.SaveChangesAsync();
