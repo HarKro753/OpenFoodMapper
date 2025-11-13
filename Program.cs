@@ -1,76 +1,195 @@
+using System.Globalization;
+using CsvHelper;
+using CsvHelper.Configuration;
+using Microsoft.EntityFrameworkCore;
+using OpenFood.Database;
+
 namespace OpenFood;
 
 class Program
 {
-    static async Task Main()
+    static async Task Main(string[] args)
     {
-        var startTime = DateTime.Now;
-
         var config = new Config();
-        var dbContext = new DatabaseContext(config);
-        var repository = new Repository(dbContext, config);
+        var connectionString = config.GetConnectionString();
 
-        try
+        var csvFiles = GetCsvFilePaths();
+        Console.WriteLine($"Found {csvFiles.Count} CSV files to process");
+
+        // Process files concurrently
+        var batchSize = config.MaxWorkers;
+        var totalUpdated = 0;
+        var totalSkipped = 0;
+        var totalErrors = 0;
+
+        var semaphore = new SemaphoreSlim(batchSize);
+        var tasks = new List<Task<(int updated, int skipped, int errors)>>();
+
+        foreach (var csvFile in csvFiles)
         {
-            var allFiles = Directory.GetFiles(config.DataFolder, "part_*")
-                .OrderBy(f => f)
-                .ToArray();
+            await semaphore.WaitAsync();
 
-            if (allFiles.Length == 0)
+            var task = Task.Run(async () =>
             {
-                Console.WriteLine($"ERROR: No files found in {config.DataFolder}/ folder!");
-                return;
-            }
-
-            var csvFiles = config.MaxFiles > 0
-                ? allFiles.Take(config.MaxFiles).ToArray()
-                : allFiles;
-
-            await dbContext.CreateTableAsync();
-
-            var failedFiles = new List<string>();
-            var semaphore = new SemaphoreSlim(config.MaxWorkers);
-            var tasks = csvFiles.Select(async (file, index) =>
-            {
-                await semaphore.WaitAsync();
                 try
                 {
-                    return await repository.UploadFileAsync(file, index + 1, csvFiles.Length);
+                    return await ProcessCsvFile(csvFile, connectionString);
                 }
                 finally
                 {
                     semaphore.Release();
                 }
-            }).ToArray();
+            });
 
-            var results = await Task.WhenAll(tasks);
-            failedFiles.AddRange(results.Where(r => !r.Success).Select(r => r.FileName));
+            tasks.Add(task);
+        }
 
-            var (totalRows, successfulFiles) = repository.GetStats();
+        var results = await Task.WhenAll(tasks);
 
-            Console.WriteLine("\n" + new string('=', 80));
-            Console.WriteLine("UPLOAD SUMMARY");
-            Console.WriteLine(new string('=', 80));
-            var totalDuration = (DateTime.Now - startTime).TotalSeconds;
-            Console.WriteLine($"Total time: {totalDuration:F1}s ({totalDuration / 60:F1} minutes)");
-            Console.WriteLine($"Successful files: {successfulFiles}/{csvFiles.Length}");
-            Console.WriteLine($"Total rows uploaded: {totalRows:N0}");
+        foreach (var result in results)
+        {
+            totalUpdated += result.updated;
+            totalSkipped += result.skipped;
+            totalErrors += result.errors;
+        }
 
-            if (failedFiles.Count > 0)
+        Console.WriteLine("\n=== Import Complete ===");
+        Console.WriteLine($"Total updated: {totalUpdated}");
+        Console.WriteLine($"Total skipped: {totalSkipped}");
+        Console.WriteLine($"Total errors: {totalErrors}");
+    }
+
+    static List<string> GetCsvFilePaths()
+    {
+        var files = new List<string>();
+        var directory = Directory.GetCurrentDirectory();
+        var foodDirectory = Path.Combine(directory, "Food");
+
+        // Generate file names from part_aa to part_bp
+        for (char first = 'a'; first <= 'b'; first++)
+        {
+            var endChar = first == 'a' ? 'z' : 'p';
+            for (char second = 'a'; second <= endChar; second++)
             {
-                Console.WriteLine($"\nFailed files ({failedFiles.Count}):");
-                foreach (var file in failedFiles)
-                    Console.WriteLine($"  - {file}");
+                var fileName = $"part_{first}{second}";
+                var filePath = Path.Combine(foodDirectory, fileName);
+
+                if (File.Exists(filePath))
+                {
+                    files.Add(filePath);
+                }
+                else
+                {
+                    Console.WriteLine($"Warning: File not found: {filePath}");
+                }
             }
-            else
+        }
+
+        return files;
+    }
+
+    static async Task<(int updated, int skipped, int errors)> ProcessCsvFile(string csvFile, string connectionString)
+    {
+        var fileName = Path.GetFileName(csvFile);
+        Console.WriteLine($"[{fileName}] Starting processing...");
+
+        var updated = 0;
+        var skipped = 0;
+        var errors = 0;
+
+        try
+        {
+            var updates = new List<(decimal code, string? categoriesEn)>();
+
+            // Read the CSV file
+            using (var reader = new StreamReader(csvFile))
+            using (var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
             {
-                Console.WriteLine("\n✓ All files uploaded successfully!");
+                HasHeaderRecord = false,
+                Delimiter = "\t",
+                BadDataFound = null,
+                MissingFieldFound = null
+            }))
+            {
+                await csv.ReadAsync();
+
+                while (await csv.ReadAsync())
+                {
+                    try
+                    {
+                        // Index 0 is code, index 23 is categories_en according to CsvSchema.cs
+                        var codeStr = csv.GetField(0);
+                        var categoriesEn = csv.GetField(23);
+
+                        if (string.IsNullOrWhiteSpace(codeStr))
+                        {
+                            skipped++;
+                            continue;
+                        }
+
+                        if (!decimal.TryParse(codeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var code))
+                        {
+                            skipped++;
+                            continue;
+                        }
+
+                        // Only add if categories_en has a value
+                        if (!string.IsNullOrWhiteSpace(categoriesEn))
+                        {
+                            updates.Add((code, categoriesEn));
+                        }
+                        else
+                        {
+                            skipped++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        errors++;
+                        Console.WriteLine($"[{fileName}] Error reading row: {ex.Message}");
+                    }
+                }
             }
+
+            // Batch update the database
+            if (updates.Count > 0)
+            {
+                var batchSize = 1000;
+                for (int i = 0; i < updates.Count; i += batchSize)
+                {
+                    var batch = updates.Skip(i).Take(batchSize).ToList();
+
+                    var optionsBuilder = new DbContextOptionsBuilder<DatabaseContext>();
+                    optionsBuilder.UseNpgsql(connectionString);
+
+                    using var context = new DatabaseContext(optionsBuilder.Options);
+
+                    foreach (var (code, categoriesEn) in batch)
+                    {
+                        var product = await context.Products.FindAsync(code);
+                        if (product != null)
+                        {
+                            product.CategoriesEn = categoriesEn;
+                            updated++;
+                        }
+                        else
+                        {
+                            skipped++;
+                        }
+                    }
+
+                    await context.SaveChangesAsync();
+                }
+            }
+
+            Console.WriteLine($"[{fileName}] Completed - Updated: {updated}, Skipped: {skipped}, Errors: {errors}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"\nFATAL ERROR: {ex.Message}");
-            Console.WriteLine(ex.StackTrace);
+            Console.WriteLine($"[{fileName}] Fatal error: {ex.Message}");
+            errors++;
         }
+
+        return (updated, skipped, errors);
     }
 }
