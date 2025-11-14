@@ -2,158 +2,249 @@ namespace OpenFood.Models;
 
 public static class CsvSchema
 {
-    // This represents ALL columns in the CSV file in their original order
-    // We need this to correctly read the CSV even though we only store some columns
-    public static readonly string[] AllColumns = {
-        // Basic info
-        "code", "url", "creator",
-        "created_t", "created_datetime",
-        "last_modified_t", "last_modified_datetime",
-        "last_modified_by",
-        "last_updated_t", "last_updated_datetime",
+    public enum Column
+    {
+        Code = 0,
+        Url = 1,
+        Creator = 2,
+        CreatedT = 3,
+        CreatedDatetime = 4,
+        LastModifiedT = 5,
+        LastModifiedDatetime = 6,
+        LastModifiedBy = 7,
+        LastUpdatedT = 8,
+        LastUpdatedDatetime = 9,
+        ProductName = 10,
+        AbbreviatedProductName = 11,
+        GenericName = 12,
+        Quantity = 13,
+        Packaging = 14,
+        PackagingTags = 15,
+        PackagingEn = 16,
+        PackagingText = 17,
+        Brands = 18,
+        BrandsTags = 19,
+        BrandsEn = 20,
+        Categories = 21,
+        CategoriesTags = 22,
+        CategoriesEn = 23,
+        Origins = 24,
+        OriginsTags = 25,
+        OriginsEn = 26,
+        ManufacturingPlaces = 27,
+        ManufacturingPlacesTags = 28,
+        Labels = 29,
+        LabelsTags = 30,
+        LabelsEn = 31,
+        EmbCodes = 32,
+        EmbCodesTags = 33,
+        FirstPackagingCodeGeo = 34,
+        Cities = 35,
+        CitiesTags = 36,
+        PurchasePlaces = 37,
+        Stores = 38,
+        Countries = 39,
+        CountriesTags = 40,
+        CountriesEn = 41,
+        IngredientsText = 42,
+        IngredientsTags = 43,
+        IngredientsAnalysisTags = 44,
+        Allergens = 45,
+        AllergensEn = 46,
+        Traces = 47,
+        TracesTags = 48,
+        TracesEn = 49,
+        ServingSize = 50,
+        ServingQuantity = 51,
+        NoNutritionData = 52,
+        AdditivesN = 53,
+        Additives = 54,
+        AdditivesTags = 55,
+        AdditivesEn = 56,
+        NutriscoreScore = 57,
+        NutriscoreGrade = 58,
+        NovaGroup = 59,
+        PnnsGroups1 = 60,
+        PnnsGroups2 = 61,
+        FoodGroups = 62,
+        FoodGroupsTags = 63,
+        FoodGroupsEn = 64,
+        States = 65,
+        StatesTags = 66,
+        StatesEn = 67,
+        BrandOwner = 68,
+        EnvironmentalScoreScore = 69,
+        EnvironmentalScoreGrade = 70,
+        NutrientLevelsTags = 71,
+        ProductQuantity = 72,
+        Owner = 73,
+        DataQualityErrorsTags = 74,
+        UniqueScansN = 75,
+        PopularityTags = 76,
+        Completeness = 77,
+        LastImageT = 78,
+        LastImageDatetime = 79,
+        MainCategory = 80,
+        MainCategoryEn = 81,
+        ImageUrl = 82,
+        ImageSmallUrl = 83,
+        ImageIngredientsUrl = 84,
+        ImageIngredientsSmallUrl = 85,
+        ImageNutritionUrl = 86,
+        ImageNutritionSmallUrl = 87,
+        EnergyKj100g = 88,
+        EnergyKcal100g = 89,
+        Energy100g = 90,
+        EnergyFromFat100g = 91,
+        Fat100g = 92,
+        SaturatedFat100g = 93,
+        ButyricAcid100g = 94,
+        CaproicAcid100g = 95,
+        CaprylicAcid100g = 96,
+        CapricAcid100g = 97,
+        LauricAcid100g = 98,
+        MyristicAcid100g = 99,
+        PalmiticAcid100g = 100,
+        StearicAcid100g = 101,
+        ArachidicAcid100g = 102,
+        BehenicAcid100g = 103,
+        LignocericAcid100g = 104,
+        CeroticAcid100g = 105,
+        MontanicAcid100g = 106,
+        MelissicAcid100g = 107,
+        UnsaturatedFat100g = 108,
+        MonounsaturatedFat100g = 109,
+        Omega9Fat100g = 110,
+        PolyunsaturatedFat100g = 111,
+        Omega3Fat100g = 112,
+        Omega6Fat100g = 113,
+        AlphaLinolenicAcid100g = 114,
+        EicosapentaenoicAcid100g = 115,
+        DocosahexaenoicAcid100g = 116,
+        LinoleicAcid100g = 117,
+        ArachidonicAcid100g = 118,
+        GammaLinolenicAcid100g = 119,
+        DihomoGammaLinolenicAcid100g = 120,
+        OleicAcid100g = 121,
+        ElaidicAcid100g = 122,
+        GondoicAcid100g = 123,
+        MeadAcid100g = 124,
+        ErucicAcid100g = 125,
+        NervonicAcid100g = 126,
+        TransFat100g = 127,
+        Cholesterol100g = 128,
+        Carbohydrates100g = 129,
+        Sugars100g = 130,
+        AddedSugars100g = 131,
+        Sucrose100g = 132,
+        Glucose100g = 133,
+        Fructose100g = 134,
+        Galactose100g = 135,
+        Lactose100g = 136,
+        Maltose100g = 137,
+        Maltodextrins100g = 138,
+        Psicose100g = 139,
+        Starch100g = 140,
+        Polyols100g = 141,
+        Erythritol100g = 142,
+        Isomalt100g = 143,
+        Maltitol100g = 144,
+        Sorbitol100g = 145,
+        Fiber100g = 146,
+        SolubleFiber100g = 147,
+        InsolubleFiber100g = 148,
+        Proteins100g = 149,
+        Casein100g = 150,
+        SerumProteins100g = 151,
+        Nucleotides100g = 152,
+        Salt100g = 153,
+        AddedSalt100g = 154,
+        Sodium100g = 155,
+        Alcohol100g = 156,
+        VitaminA100g = 157,
+        BetaCarotene100g = 158,
+        VitaminD100g = 159,
+        VitaminE100g = 160,
+        VitaminK100g = 161,
+        VitaminC100g = 162,
+        VitaminB1_100g = 163,
+        VitaminB2_100g = 164,
+        VitaminPp100g = 165,
+        VitaminB6_100g = 166,
+        VitaminB9_100g = 167,
+        Folates100g = 168,
+        VitaminB12_100g = 169,
+        Biotin100g = 170,
+        PantothenicAcid100g = 171,
+        Silica100g = 172,
+        Bicarbonate100g = 173,
+        Potassium100g = 174,
+        Chloride100g = 175,
+        Calcium100g = 176,
+        Phosphorus100g = 177,
+        Iron100g = 178,
+        Magnesium100g = 179,
+        Zinc100g = 180,
+        Copper100g = 181,
+        Manganese100g = 182,
+        Fluoride100g = 183,
+        Selenium100g = 184,
+        Chromium100g = 185,
+        Molybdenum100g = 186,
+        Iodine100g = 187,
+        Caffeine100g = 188,
+        Taurine100g = 189,
+        Methylsulfonylmethane100g = 190,
+        Ph100g = 191,
+        FruitsVegetablesNuts100g = 192,
+        FruitsVegetablesNutsDried100g = 193,
+        FruitsVegetablesNutsEstimate100g = 194,
+        FruitsVegetablesNutsEstimateFromIngredients100g = 195,
+        CollagenMeatProteinRatio100g = 196,
+        Cocoa100g = 197,
+        Chlorophyl100g = 198,
+        CarbonFootprint100g = 199,
+        CarbonFootprintFromMeatOrFish100g = 200,
+        NutritionScoreFr100g = 201,
+        NutritionScoreUk100g = 202,
+        GlycemicIndex100g = 203,
+        WaterHardness100g = 204,
+        Choline100g = 205,
+        Phylloquinone100g = 206,
+        BetaGlucan100g = 207,
+        Inositol100g = 208,
+        Carnitine100g = 209,
+        Sulphate100g = 210,
+        Nitrate100g = 211,
+        Acidity100g = 212,
+        CarbohydratesTotal100g = 213
+    }
 
-        // Product details
-        "product_name", "abbreviated_product_name",
-        "generic_name", "quantity",
+    public static string? Get(string[] fields, Column column)
+    {
+        var index = (int)column;
+        if (index >= fields.Length) return null;
+        var value = fields[index];
+        return string.IsNullOrWhiteSpace(value) ? null : value;
+    }
 
-        // Packaging
-        "packaging", "packaging_tags", "packaging_en", "packaging_text",
+    public static decimal? GetDecimal(string[] fields, Column column)
+    {
+        var value = Get(fields, column);
+        if (value == null) return null;
+        return decimal.TryParse(value, out var result) ? result : null;
+    }
 
-        // Brands
-        "brands", "brands_tags", "brands_en",
+    public static int? GetInt(string[] fields, Column column)
+    {
+        var value = Get(fields, column);
+        if (value == null) return null;
+        return int.TryParse(value, out var result) ? result : null;
+    }
 
-        // Categories
-        "categories", "categories_tags", "categories_en",
-
-        // Origins
-        "origins", "origins_tags", "origins_en",
-
-        // Manufacturing
-        "manufacturing_places", "manufacturing_places_tags",
-
-        // Labels
-        "labels", "labels_tags", "labels_en",
-
-        // Codes
-        "emb_codes", "emb_codes_tags", "first_packaging_code_geo",
-
-        // Places
-        "cities", "cities_tags", "purchase_places",
-        "stores", "countries", "countries_tags", "countries_en",
-
-        // Ingredients
-        "ingredients_text", "ingredients_tags",
-        "ingredients_analysis_tags",
-
-        // Allergens
-        "allergens", "allergens_en",
-        "traces", "traces_tags", "traces_en",
-
-        // Serving
-        "serving_size", "serving_quantity", "no_nutrition_data",
-
-        // Additives
-        "additives_n", "additives", "additives_tags", "additives_en",
-
-        // Scores
-        "nutriscore_score", "nutriscore_grade", "nova_group",
-        "pnns_groups_1", "pnns_groups_2",
-
-        // Food groups
-        "food_groups", "food_groups_tags", "food_groups_en",
-
-        // States
-        "states", "states_tags", "states_en",
-
-        // Owner
-        "brand_owner",
-
-        // Environmental
-        "environmental_score_score", "environmental_score_grade",
-
-        // Quality
-        "nutrient_levels_tags", "product_quantity",
-        "owner", "data_quality_errors_tags",
-
-        // Popularity
-        "unique_scans_n", "popularity_tags",
-        "completeness",
-
-        // Images
-        "last_image_t", "last_image_datetime",
-        "main_category", "main_category_en",
-        "image_url", "image_small_url",
-        "image_ingredients_url", "image_ingredients_small_url",
-        "image_nutrition_url", "image_nutrition_small_url",
-
-        // Nutrition - Energy
-        "energy-kj_100g", "energy-kcal_100g", "energy_100g",
-        "energy-from-fat_100g",
-
-        // Nutrition - Fats
-        "fat_100g", "saturated-fat_100g",
-        "butyric-acid_100g", "caproic-acid_100g", "caprylic-acid_100g",
-        "capric-acid_100g", "lauric-acid_100g", "myristic-acid_100g",
-        "palmitic-acid_100g", "stearic-acid_100g", "arachidic-acid_100g",
-        "behenic-acid_100g", "lignoceric-acid_100g", "cerotic-acid_100g",
-        "montanic-acid_100g", "melissic-acid_100g",
-        "unsaturated-fat_100g", "monounsaturated-fat_100g", "omega-9-fat_100g",
-        "polyunsaturated-fat_100g", "omega-3-fat_100g", "omega-6-fat_100g",
-        "alpha-linolenic-acid_100g", "eicosapentaenoic-acid_100g",
-        "docosahexaenoic-acid_100g", "linoleic-acid_100g", "arachidonic-acid_100g",
-        "gamma-linolenic-acid_100g", "dihomo-gamma-linolenic-acid_100g",
-        "oleic-acid_100g", "elaidic-acid_100g", "gondoic-acid_100g",
-        "mead-acid_100g", "erucic-acid_100g", "nervonic-acid_100g",
-        "trans-fat_100g", "cholesterol_100g",
-
-        // Nutrition - Carbohydrates
-        "carbohydrates_100g", "sugars_100g", "added-sugars_100g",
-        "sucrose_100g", "glucose_100g", "fructose_100g",
-        "galactose_100g", "lactose_100g", "maltose_100g",
-        "maltodextrins_100g", "psicose_100g", "starch_100g",
-        "polyols_100g", "erythritol_100g", "isomalt_100g",
-        "maltitol_100g", "sorbitol_100g",
-
-        // Nutrition - Fiber & Proteins
-        "fiber_100g", "soluble-fiber_100g", "insoluble-fiber_100g",
-        "proteins_100g", "casein_100g", "serum-proteins_100g",
-        "nucleotides_100g",
-
-        // Nutrition - Salt & Sodium
-        "salt_100g", "added-salt_100g", "sodium_100g",
-        "alcohol_100g",
-
-        // Nutrition - Vitamins
-        "vitamin-a_100g", "beta-carotene_100g", "vitamin-d_100g",
-        "vitamin-e_100g", "vitamin-k_100g", "vitamin-c_100g",
-        "vitamin-b1_100g", "vitamin-b2_100g", "vitamin-pp_100g",
-        "vitamin-b6_100g", "vitamin-b9_100g", "folates_100g",
-        "vitamin-b12_100g", "biotin_100g", "pantothenic-acid_100g",
-
-        // Nutrition - Minerals
-        "silica_100g", "bicarbonate_100g", "potassium_100g",
-        "chloride_100g", "calcium_100g", "phosphorus_100g",
-        "iron_100g", "magnesium_100g", "zinc_100g",
-        "copper_100g", "manganese_100g", "fluoride_100g",
-        "selenium_100g", "chromium_100g", "molybdenum_100g",
-        "iodine_100g",
-
-        // Nutrition - Other
-        "caffeine_100g", "taurine_100g",
-        "methylsulfonylmethane_100g", "ph_100g",
-
-        // Nutrition - Fruits/Vegetables
-        "fruits-vegetables-nuts_100g", "fruits-vegetables-nuts-dried_100g",
-        "fruits-vegetables-nuts-estimate_100g",
-        "fruits-vegetables-nuts-estimate-from-ingredients_100g",
-
-        // Nutrition - Misc
-        "collagen-meat-protein-ratio_100g", "cocoa_100g", "chlorophyl_100g",
-        "carbon-footprint_100g", "carbon-footprint-from-meat-or-fish_100g",
-        "nutrition-score-fr_100g", "nutrition-score-uk_100g",
-        "glycemic-index_100g", "water-hardness_100g", "choline_100g",
-        "phylloquinone_100g", "beta-glucan_100g",
-        "inositol_100g", "carnitine_100g", "sulphate_100g",
-        "nitrate_100g", "acidity_100g", "carbohydrates-total_100g"
-    };
+    public static List<string> GetList(string[] fields, Column column)
+    {
+        var value = Get(fields, column);
+        return value == null ? [] : Tools.ParseCommaSeparatedValues(value);
+    }
 }

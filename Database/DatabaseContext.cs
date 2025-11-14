@@ -1,11 +1,14 @@
-namespace OpenFood.Database.Models;
+using Microsoft.EntityFrameworkCore;
 
-namespace Backend.Database;
+namespace OpenFood.Database.Models;
 
 public class DatabaseContext : DbContext
 {
-    public DatabaseContext(DbContextOptions<DatabaseContext> options) : base(options)
+    private readonly Config _config;
+
+    public DatabaseContext(Config config)
     {
+        _config = config;
     }
 
     public DbSet<Product> Products { get; set; }
@@ -20,9 +23,19 @@ public class DatabaseContext : DbContext
     public DbSet<ProductIngredient> ProductIngredients { get; set; } = null!;
     public DbSet<Country> Countries { get; set; }
     public DbSet<ProductCountry> ProductCountries { get; set; }
-    public DbSet<User> Users { get; set; }
-    public DbSet<ProductHistory> ProductHistories { get; set; }
-    public DbSet<UserFavoriteProduct> UserFavoriteProducts { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            optionsBuilder.UseNpgsql(_config.ConnectionString);
+        }
+    }
+
+    public async Task CreateTableAsync()
+    {
+        await Database.EnsureCreatedAsync();
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -360,68 +373,6 @@ public class DatabaseContext : DbContext
 
             entity.HasIndex(pc => pc.CountryId)
                 .HasDatabaseName("idx_product_countries_country");
-        });
-
-        modelBuilder.Entity<User>(entity =>
-        {
-            entity.ToTable("users");
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.Username).HasColumnName("username").IsRequired();
-            entity.Property(e => e.Email).HasColumnName("email").IsRequired();
-            entity.Property(e => e.PasswordHash).HasColumnName("password_hash").IsRequired();
-
-            entity.HasIndex(e => e.Username).IsUnique();
-            entity.HasIndex(e => e.Email).IsUnique();
-        });
-
-        modelBuilder.Entity<ProductHistory>(entity =>
-        {
-            entity.ToTable("product_history");
-            entity.HasKey(e => e.Id);
-
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.UserId).HasColumnName("user_id");
-            entity.Property(e => e.ProductCode).HasColumnName("product_code");
-            entity.Property(e => e.ScannedAt).HasColumnName("scanned_at");
-
-            entity.HasOne(e => e.User)
-                .WithMany(e => e.ProductHistory)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(e => e.Product)
-                .WithMany(e => e.ProductHistories)
-                .HasForeignKey(e => e.ProductCode)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasIndex(e => e.UserId);
-            entity.HasIndex(e => e.ProductCode);
-            entity.HasIndex(e => e.ScannedAt);
-        });
-
-        modelBuilder.Entity<UserFavoriteProduct>(entity =>
-        {
-            entity.ToTable("user_favorite_products");
-            entity.HasKey(e => new { e.UserId, e.ProductCode });
-
-            entity.Property(e => e.UserId).HasColumnName("user_id");
-            entity.Property(e => e.ProductCode).HasColumnName("product_code");
-            entity.Property(e => e.FavoritedAt).HasColumnName("favorited_at");
-
-            entity.HasOne(e => e.User)
-                .WithMany(e => e.FavoriteProducts)
-                .HasForeignKey(e => e.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasOne(e => e.Product)
-                .WithMany(e => e.UserFavorites)
-                .HasForeignKey(e => e.ProductCode)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            entity.HasIndex(e => e.ProductCode);
-            entity.HasIndex(e => e.FavoritedAt);
         });
     }
 }

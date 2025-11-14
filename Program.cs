@@ -1,246 +1,92 @@
-using System.Globalization;
-using CsvHelper;
-using CsvHelper.Configuration;
-using Microsoft.EntityFrameworkCore;
-using OpenFood.Database.Models.Backend.Database;
+using OpenFood;
+using OpenFood.Database.Models;
 
-namespace OpenFood;
+var startTime = DateTime.Now;
 
-class Program
+var config = new Config();
+
+using (var initDbContext = new DatabaseContext(config))
 {
-    static async Task Main(string[] args)
+    await initDbContext.CreateTableAsync();
+}
+
+try
+{
+    var allFiles = Directory.GetFiles(config.DataFolder, "part_*")
+        .OrderBy(f => f)
+        .ToArray();
+
+    if (allFiles.Length == 0)
     {
-        var config = new Config();
-        var connectionString = config.GetConnectionString();
-
-        var csvFiles = Tools.GetCsvFilePaths();
-        Console.WriteLine($"Found {csvFiles.Count} CSV files to process");
-
-        // Process files concurrently
-        var batchSize = config.MaxWorkers;
-        var totalUpdated = 0;
-        var totalSkipped = 0;
-        var totalErrors = 0;
-
-        var semaphore = new SemaphoreSlim(batchSize);
-        var tasks = new List<Task<(int updated, int skipped, int errors)>>();
-
-        foreach (var csvFile in csvFiles)
-        {
-            await semaphore.WaitAsync();
-
-            var task = Task.Run(async () =>
-            {
-                try
-                {
-                    return await ProcessCsvFile(csvFile, connectionString);
-                }
-                finally
-                {
-                    semaphore.Release();
-                }
-            });
-
-            tasks.Add(task);
-        }
-
-        var results = await Task.WhenAll(tasks);
-
-        foreach (var result in results)
-        {
-            totalUpdated += result.updated;
-            totalSkipped += result.skipped;
-            totalErrors += result.errors;
-        }
-
-        Console.WriteLine("\n=== Import Complete ===");
-        Console.WriteLine($"Total updated: {totalUpdated}");
-        Console.WriteLine($"Total skipped: {totalSkipped}");
-        Console.WriteLine($"Total errors: {totalErrors}");
+        Console.WriteLine($"ERROR: No files found in {config.DataFolder}/ folder!");
+        return;
     }
 
-    
+    var csvFiles = config.MaxFiles > 0
+        ? allFiles.Take(config.MaxFiles).ToArray()
+        : allFiles;
 
-    static async Task<(int updated, int skipped, int errors)> ProcessCsvFile(string csvFile, string connectionString)
+    var semaphore = new SemaphoreSlim(config.MaxWorkers);
+    var statsLock = new object();
+    var totalRows = 0;
+    var successfulFiles = 0;
+
+    var tasks = csvFiles.Select(async (file, index) =>
     {
-        var fileName = Path.GetFileName(csvFile);
-        Console.WriteLine($"[{fileName}] Starting processing...");
-
-        var updated = 0;
-        var skipped = 0;
-        var errors = 0;
-
+        await semaphore.WaitAsync();
         try
         {
-            var updates = new List<(decimal code, string? categoriesEn, string? countries)>();
+            // Create a new DbContext for each parallel task
+            using var dbContext = new DatabaseContext(config);
+            var repository = new Repository(dbContext);
+            var csvController = new CsvController(repository, config);
 
-            // Read the CSV file
-            using (var reader = new StreamReader(csvFile))
-            using (var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+            var result = await csvController.ProcessFileAsync(file, index + 1, csvFiles.Length);
+
+            // Update stats in a thread-safe manner
+            var stats = csvController.GetStats();
+            lock (statsLock)
             {
-                HasHeaderRecord = false,
-                Delimiter = "\t",
-                BadDataFound = null,
-                MissingFieldFound = null
-            }))
-            {
-                await csv.ReadAsync();
-
-                while (await csv.ReadAsync())
-                {
-                    try
-                    {
-                        // Index 0 is code, index 23 is categories_en, index 39 is countries according to CsvSchema.cs
-                        var codeStr = csv.GetField(0);
-                        var categoriesEn = csv.GetField(23);
-                        var countries = csv.GetField(39);
-
-                        if (string.IsNullOrWhiteSpace(codeStr))
-                        {
-                            skipped++;
-                            continue;
-                        }
-
-                        if (!decimal.TryParse(codeStr, NumberStyles.Any, CultureInfo.InvariantCulture, out var code))
-                        {
-                            skipped++;
-                            continue;
-                        }
-
-                        // Only add if at least one field has a value
-                        if (!string.IsNullOrWhiteSpace(categoriesEn) || !string.IsNullOrWhiteSpace(countries))
-                        {
-                            updates.Add((code, categoriesEn, countries));
-                        }
-                        else
-                        {
-                            skipped++;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        errors++;
-                        Console.WriteLine($"[{fileName}] Error reading row: {ex.Message}");
-                    }
-                }
+                totalRows += stats.TotalRows;
+                if (result.Success)
+                    successfulFiles++;
             }
 
-            // Batch update the database
-            if (updates.Count > 0)
-            {
-                var batchSize = 500;
-                for (int i = 0; i < updates.Count; i += batchSize)
-                {
-                    var batch = updates.Skip(i).Take(batchSize).ToList();
-
-                    var optionsBuilder = new DbContextOptionsBuilder<DatabaseContext>();
-                    optionsBuilder.UseNpgsql(connectionString);
-
-                    using var context = new DatabaseContext(optionsBuilder.Options);
-
-                    // Track relationships we're adding in this batch to avoid duplicates
-                    var addedProductCategories = new HashSet<(decimal, int)>();
-                    var addedProductCountries = new HashSet<(decimal, int)>();
-
-                    foreach (var (code, categoriesEn, countries) in batch)
-                    {
-                        var product = await context.Products.FindAsync(code);
-                        if (product == null)
-                        {
-                            skipped++;
-                            continue;
-                        }
-
-                        // Update the raw columns
-                        if (!string.IsNullOrWhiteSpace(categoriesEn))
-                        {
-                            product.CategoriesEn = categoriesEn;
-
-                            // Parse and insert categories (deduplicate within the product)
-                            var categoryNames = Tools.ParseCommaSeparatedValues(categoriesEn).Distinct().ToList();
-                            foreach (var categoryName in categoryNames)
-                            {
-                                var category = await context.Categories.AsNoTracking().FirstOrDefaultAsync(c => c.Name == categoryName);
-                                if (category == null)
-                                {
-                                    category = new Database.Models.Category { Name = categoryName };
-                                    context.Categories.Add(category);
-                                    await context.SaveChangesAsync(); // Save to get the ID
-                                    context.Entry(category).State = EntityState.Detached; // Detach to avoid tracking issues
-                                }
-
-                                // Check if relationship already exists in DB or in current batch
-                                var relationKey = (code, category.Id);
-                                if (!addedProductCategories.Contains(relationKey))
-                                {
-                                    var existingRelation = await context.ProductCategories.AsNoTracking()
-                                        .AnyAsync(pc => pc.ProductCode == code && pc.CategoryId == category.Id);
-
-                                    if (!existingRelation)
-                                    {
-                                        context.ProductCategories.Add(new Database.Models.ProductCategory
-                                        {
-                                            ProductCode = code,
-                                            CategoryId = category.Id
-                                        });
-                                        addedProductCategories.Add(relationKey);
-                                    }
-                                }
-                            }
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(countries))
-                        {
-                            product.Countries = countries;
-
-                            // Parse and insert countries (deduplicate within the product)
-                            var countryNames = Tools.ParseCommaSeparatedValues(countries).Distinct().ToList();
-                            foreach (var countryName in countryNames)
-                            {
-                                var country = await context.Countries.AsNoTracking().FirstOrDefaultAsync(c => c.Name == countryName);
-                                if (country == null)
-                                {
-                                    country = new Database.Models.Country { Name = countryName };
-                                    context.Countries.Add(country);
-                                    await context.SaveChangesAsync(); // Save to get the ID
-                                    context.Entry(country).State = EntityState.Detached; // Detach to avoid tracking issues
-                                }
-
-                                // Check if relationship already exists in DB or in current batch
-                                var relationKey = (code, country.Id);
-                                if (!addedProductCountries.Contains(relationKey))
-                                {
-                                    var existingRelation = await context.ProductCountries.AsNoTracking()
-                                        .AnyAsync(pc => pc.ProductCode == code && pc.CountryId == country.Id);
-
-                                    if (!existingRelation)
-                                    {
-                                        context.ProductCountries.Add(new Database.Models.ProductCountry
-                                        {
-                                            ProductCode = code,
-                                            CountryId = country.Id
-                                        });
-                                        addedProductCountries.Add(relationKey);
-                                    }
-                                }
-                            }
-                        }
-
-                        updated++;
-                    }
-
-                    await context.SaveChangesAsync();
-                }
-            }
-
-            Console.WriteLine($"[{fileName}] Completed - Updated: {updated}, Skipped: {skipped}, Errors: {errors}");
+            return result;
         }
-        catch (Exception ex)
+        finally
         {
-            Console.WriteLine($"[{fileName}] Fatal error: {ex.Message}");
-            errors++;
+            semaphore.Release();
         }
+    }).ToArray();
 
-        return (updated, skipped, errors);
+    var results = await Task.WhenAll(tasks);
+    var failedFiles = results.Where(r => !r.Success).Select(r => r.FileName).ToList();
+
+    Console.WriteLine("\n" + new string('=', 80));
+    Console.WriteLine("UPLOAD SUMMARY");
+    Console.WriteLine(new string('=', 80));
+    var totalDuration = (DateTime.Now - startTime).TotalSeconds;
+    Console.WriteLine($"Total time: {totalDuration:F1}s ({totalDuration / 60:F1} minutes)");
+    lock (statsLock)
+    {
+        Console.WriteLine($"Successful files: {successfulFiles}/{csvFiles.Length}");
+        Console.WriteLine($"Total rows uploaded: {totalRows:N0}");
     }
+
+    if (failedFiles.Count > 0)
+    {
+        Console.WriteLine($"\nFailed files ({failedFiles.Count}):");
+        foreach (var file in failedFiles)
+            Console.WriteLine($"  - {file}");
+    }
+    else
+    {
+        Console.WriteLine("\nAll files uploaded successfully!");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"\nFATAL ERROR: {ex.Message}");
+    Console.WriteLine(ex.StackTrace);
 }
