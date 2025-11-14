@@ -1,10 +1,10 @@
 namespace OpenFood.Database.Models;
 
-public class Category
+public class HealthRisk
 {
     public int Id { get; set; }
     public string Name { get; set; } = null!;
 
     // Navigation properties
-    public ICollection<ProductCategory> ProductCategories { get; set; } = new List<ProductCategory>();
+    public ICollection<AdditiveHealthRisk> AdditiveHealthRisks { get; set; } = new List<AdditiveHealthRisk>();
 }

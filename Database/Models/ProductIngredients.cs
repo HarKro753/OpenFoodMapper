@@ -1,11 +1,11 @@
 namespace OpenFood.Database.Models;
 
-public class ProductCategory
+public class ProductIngredient
 {
     public decimal ProductCode { get; set; }
-    public int CategoryId { get; set; }
+    public int IngredientId { get; set; }
 
     // Navigation properties
     public Product Product { get; set; } = null!;
-    public Category Category { get; set; } = null!;
+    public Ingredient Ingredient { get; set; } = null!;
 }

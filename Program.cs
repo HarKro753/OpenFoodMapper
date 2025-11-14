@@ -2,7 +2,7 @@ using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.EntityFrameworkCore;
-using OpenFood.Database;
+using OpenFood.Database.Models.Backend.Database;
 
 namespace OpenFood;
 
