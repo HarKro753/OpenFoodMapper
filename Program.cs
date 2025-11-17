@@ -1,6 +1,8 @@
-using Microsoft.Extensions.Hosting;
-
 var builder = Host.CreateApplicationBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddFilter((category, level) => level >= LogLevel.Error);
 
 var config = new Config
 {

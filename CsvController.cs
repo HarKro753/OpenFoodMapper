@@ -197,9 +197,6 @@ public class CsvController
             NovaGroup = CsvSchema.GetInt(fields, CsvSchema.Column.NovaGroup),
             EnvironmentalScore = CsvSchema.GetDecimal(fields, CsvSchema.Column.EnvironmentalScoreScore),
 
-            IngredientsTags = CsvSchema.Get(fields, CsvSchema.Column.IngredientsTags),
-            IngredientsText = CsvSchema.Get(fields, CsvSchema.Column.IngredientsText),
-
             Completeness = CsvSchema.GetDecimal(fields, CsvSchema.Column.Completeness),
             LastImageDatetime = CsvSchema.Get(fields, CsvSchema.Column.LastImageDatetime),
             LastModifiedDatetime = CsvSchema.Get(fields, CsvSchema.Column.LastModifiedDatetime),
@@ -311,10 +308,7 @@ public class CsvController
             Taurine100g = CsvSchema.GetDecimal(fields, CsvSchema.Column.Taurine100g),
             Methylsulfonylmethane100g = CsvSchema.GetDecimal(fields, CsvSchema.Column.Methylsulfonylmethane100g),
             Ph100g = CsvSchema.GetDecimal(fields, CsvSchema.Column.Ph100g),
-
-            FruitsVegetablesNuts100g = CsvSchema.GetDecimal(fields, CsvSchema.Column.FruitsVegetablesNuts100g),
-            FruitsVegetablesNutsDried100g = CsvSchema.GetDecimal(fields, CsvSchema.Column.FruitsVegetablesNutsDried100g),
-            FruitsVegetablesNutsEstimate100g = CsvSchema.GetDecimal(fields, CsvSchema.Column.FruitsVegetablesNutsEstimate100g),
+            
             FruitsVegetablesNutsEstimateFromIngredients100g = CsvSchema.GetDecimal(fields, CsvSchema.Column.FruitsVegetablesNutsEstimateFromIngredients100g)
         };
     }

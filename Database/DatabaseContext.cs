@@ -1,4 +1,6 @@
-namespace OpenFood.Database.Models;
+using Backend.Database.Models;
+
+namespace Backend.Database;
 
 public class DatabaseContext : DbContext
 {
@@ -24,6 +26,9 @@ public class DatabaseContext : DbContext
     public DbSet<ProductFoodGroup> ProductFoodGroups { get; set; }
     public DbSet<Label> Labels { get; set; }
     public DbSet<ProductLabel> ProductLabels { get; set; }
+    public DbSet<User> Users { get; set; }
+    public DbSet<ProductHistory> ProductHistories { get; set; }
+    public DbSet<UserFavoriteProduct> UserFavoriteProducts { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,10 +56,6 @@ public class DatabaseContext : DbContext
             entity.Property(e => e.Completeness).HasColumnName("completeness");
             entity.Property(e => e.LastImageDatetime).HasColumnName("last_image_datetime");
             entity.Property(e => e.LastModifiedDatetime).HasColumnName("last_modified_datetime");
-
-            // Ingredients
-            entity.Property(e => e.IngredientsTags).HasColumnName("ingredients_tags");
-            entity.Property(e => e.IngredientsText).HasColumnName("ingredients_text");
 
             // Nutrients per 100g
             entity.Property(e => e.EnergyKcal100g).HasColumnName("energy-kcal_100g");
@@ -172,9 +173,6 @@ public class DatabaseContext : DbContext
             entity.Property(e => e.Ph100g).HasColumnName("ph_100g");
 
             // Fruits/Vegetables
-            entity.Property(e => e.FruitsVegetablesNuts100g).HasColumnName("fruits_vegetables_nuts_100g");
-            entity.Property(e => e.FruitsVegetablesNutsDried100g).HasColumnName("fruits_vegetables_nuts_dried_100g");
-            entity.Property(e => e.FruitsVegetablesNutsEstimate100g).HasColumnName("fruits_vegetables_nuts_estimate_100g");
             entity.Property(e => e.FruitsVegetablesNutsEstimateFromIngredients100g).HasColumnName("fruits_vegetables_nuts_estimate_from_ingredients_100g");
         });
 
@@ -304,8 +302,10 @@ public class DatabaseContext : DbContext
                 entity.ToTable("ingredients");
                 entity.HasKey(e => e.Id);
 
-                entity.Property(e => e.Name).IsRequired();
-                entity.Property(e => e.IsVegetable).IsRequired();
+                entity.Property(e => e.Id).HasColumnName("id");
+                entity.Property(e => e.Name).HasColumnName("name").IsRequired();
+
+                entity.HasIndex(e => e.Name).IsUnique();
 
                 entity.HasMany(e => e.ProductIngredients)
                     .WithOne(pi => pi.Ingredient)
@@ -318,13 +318,20 @@ public class DatabaseContext : DbContext
 
                 entity.HasKey(e => new { e.ProductCode, e.IngredientId });
 
+                entity.Property(e => e.ProductCode).HasColumnName("product_code");
+                entity.Property(e => e.IngredientId).HasColumnName("ingredient_id");
+
                 entity.HasOne(pi => pi.Product)
                     .WithMany(p => p.ProductIngredients)
-                    .HasForeignKey(pi => pi.ProductCode);
+                    .HasForeignKey(pi => pi.ProductCode)
+                    .OnDelete(DeleteBehavior.Cascade);
 
                 entity.HasOne(pi => pi.Ingredient)
                     .WithMany(i => i.ProductIngredients)
-                    .HasForeignKey(pi => pi.IngredientId);
+                    .HasForeignKey(pi => pi.IngredientId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasIndex(e => e.IngredientId).HasDatabaseName("idx_product_ingredients_ingredient");
             });
 
         modelBuilder.Entity<Country>(entity =>
@@ -454,6 +461,68 @@ public class DatabaseContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => e.LabelId).HasDatabaseName("idx_product_labels_label");
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.ToTable("users");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Username).HasColumnName("username").IsRequired();
+            entity.Property(e => e.Email).HasColumnName("email").IsRequired();
+            entity.Property(e => e.PasswordHash).HasColumnName("password_hash").IsRequired();
+
+            entity.HasIndex(e => e.Username).IsUnique();
+            entity.HasIndex(e => e.Email).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductHistory>(entity =>
+        {
+            entity.ToTable("product_history");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.ProductCode).HasColumnName("product_code");
+            entity.Property(e => e.ScannedAt).HasColumnName("scanned_at");
+
+            entity.HasOne(e => e.User)
+                .WithMany(e => e.ProductHistory)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Product)
+                .WithMany(e => e.ProductHistories)
+                .HasForeignKey(e => e.ProductCode)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.ProductCode);
+            entity.HasIndex(e => e.ScannedAt);
+        });
+
+        modelBuilder.Entity<UserFavoriteProduct>(entity =>
+        {
+            entity.ToTable("user_favorite_products");
+            entity.HasKey(e => new { e.UserId, e.ProductCode });
+
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.ProductCode).HasColumnName("product_code");
+            entity.Property(e => e.FavoritedAt).HasColumnName("favorited_at");
+
+            entity.HasOne(e => e.User)
+                .WithMany(e => e.FavoriteProducts)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Product)
+                .WithMany(e => e.UserFavorites)
+                .HasForeignKey(e => e.ProductCode)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.ProductCode);
+            entity.HasIndex(e => e.FavoritedAt);
         });
     }
 }

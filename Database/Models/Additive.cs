@@ -1,4 +1,4 @@
-namespace OpenFood.Database.Models;
+namespace Backend.Database.Models;
 
 public class Additive
 {
