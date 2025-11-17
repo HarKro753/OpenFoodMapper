@@ -1,5 +1,3 @@
-using OpenFood.Database.Models;
-using OpenFood.Models;
 
 namespace OpenFood;
 
@@ -7,9 +5,6 @@ public class CsvController
 {
     private readonly Repository _repository;
     private readonly Config _config;
-    private int _totalRows;
-    private int _successfulFiles;
-    private readonly object _statsLock = new();
 
     public CsvController(Repository repository, Config config)
     {
@@ -17,18 +12,9 @@ public class CsvController
         _config = config;
     }
 
-    public (int TotalRows, int SuccessfulFiles) GetStats()
-    {
-        lock (_statsLock)
-        {
-            return (_totalRows, _successfulFiles);
-        }
-    }
-
     public async Task<(bool Success, string FileName)> ProcessFileAsync(string filePath, int fileIndex, int totalFiles)
     {
         var fileName = Path.GetFileName(filePath);
-        var startTime = DateTime.Now;
 
         try
         {
@@ -39,11 +25,12 @@ public class CsvController
             var additivesMap = new Dictionary<decimal, List<string>>();
             var ingredientsMap = new Dictionary<decimal, List<string>>();
             var countriesMap = new Dictionary<decimal, List<string>>();
+            var allergensMap = new Dictionary<decimal, List<string>>();
+            var foodGroupsMap = new Dictionary<decimal, List<string>>();
+            var labelsMap = new Dictionary<decimal, List<string>>();
 
-            var lineCount = 0;
             await foreach (var line in File.ReadLinesAsync(filePath))
             {
-                lineCount++;
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
                 var fields = ParseCsvLine(line);
@@ -67,28 +54,36 @@ public class CsvController
                 var countries = CsvSchema.GetList(fields, CsvSchema.Column.CountriesEn);
                 if (countries.Count > 0) countriesMap[code] = countries;
 
+                var allergens = CsvSchema.GetList(fields, CsvSchema.Column.AllergensEn);
+                if (allergens.Count > 0) allergensMap[code] = allergens;
+
+                var foodGroups = CsvSchema.GetList(fields, CsvSchema.Column.FoodGroupsEn);
+                if (foodGroups.Count > 0) foodGroupsMap[code] = foodGroups;
+
+                var labels = CsvSchema.GetList(fields, CsvSchema.Column.LabelsEn);
+                if (labels.Count > 0) labelsMap[code] = labels;
+
                 if (products.Count >= _config.BatchSize)
                 {
-                    await ProcessBatchAsync(products, categoriesMap, additivesMap, ingredientsMap, countriesMap);
-                    lock (_statsLock) _totalRows += products.Count;
+                    await ProcessBatchAsync(products, categoriesMap, additivesMap, ingredientsMap, countriesMap, allergensMap, foodGroupsMap, labelsMap);
                     products.Clear();
                     categoriesMap.Clear();
                     additivesMap.Clear();
                     ingredientsMap.Clear();
                     countriesMap.Clear();
+                    allergensMap.Clear();
+                    foodGroupsMap.Clear();
+                    labelsMap.Clear();
                 }
             }
 
             if (products.Count > 0)
             {
-                await ProcessBatchAsync(products, categoriesMap, additivesMap, ingredientsMap, countriesMap);
-                lock (_statsLock) _totalRows += products.Count;
+                await ProcessBatchAsync(products, categoriesMap, additivesMap, ingredientsMap, countriesMap, allergensMap, foodGroupsMap, labelsMap);
             }
 
-            var duration = (DateTime.Now - startTime).TotalSeconds;
-            Console.WriteLine($"[{fileIndex}/{totalFiles}] {fileName} completed ({lineCount:N0} lines, {duration:F1}s)");
+            Console.WriteLine($"[{fileIndex}/{totalFiles}] {fileName} completed");
 
-            lock (_statsLock) _successfulFiles++;
             return (true, fileName);
         }
         catch (Exception ex)
@@ -103,7 +98,10 @@ public class CsvController
         Dictionary<decimal, List<string>> categoriesMap,
         Dictionary<decimal, List<string>> additivesMap,
         Dictionary<decimal, List<string>> ingredientsMap,
-        Dictionary<decimal, List<string>> countriesMap)
+        Dictionary<decimal, List<string>> countriesMap,
+        Dictionary<decimal, List<string>> allergensMap,
+        Dictionary<decimal, List<string>> foodGroupsMap,
+        Dictionary<decimal, List<string>> labelsMap)
     {
         await _repository.UpsertProductsAsync(products);
 
@@ -150,6 +148,39 @@ public class CsvController
                 .ToList();
             await _repository.LinkProductCountriesAsync(code, countryIds);
         }
+
+        var allAllergenNames = allergensMap.Values.SelectMany(x => x).Distinct().ToList();
+        var allergenIdMap = await _repository.GetOrCreateAllergensAsync(allAllergenNames);
+        foreach (var (code, allergenNames) in allergensMap)
+        {
+            var allergenIds = allergenNames
+                .Where(name => allergenIdMap.ContainsKey(name))
+                .Select(name => allergenIdMap[name])
+                .ToList();
+            await _repository.LinkProductAllergensAsync(code, allergenIds);
+        }
+
+        var allFoodGroupNames = foodGroupsMap.Values.SelectMany(x => x).Distinct().ToList();
+        var foodGroupIdMap = await _repository.GetOrCreateFoodGroupsAsync(allFoodGroupNames);
+        foreach (var (code, foodGroupNames) in foodGroupsMap)
+        {
+            var foodGroupIds = foodGroupNames
+                .Where(name => foodGroupIdMap.ContainsKey(name))
+                .Select(name => foodGroupIdMap[name])
+                .ToList();
+            await _repository.LinkProductFoodGroupsAsync(code, foodGroupIds);
+        }
+
+        var allLabelNames = labelsMap.Values.SelectMany(x => x).Distinct().ToList();
+        var labelIdMap = await _repository.GetOrCreateLabelsAsync(allLabelNames);
+        foreach (var (code, labelNames) in labelsMap)
+        {
+            var labelIds = labelNames
+                .Where(name => labelIdMap.ContainsKey(name))
+                .Select(name => labelIdMap[name])
+                .ToList();
+            await _repository.LinkProductLabelsAsync(code, labelIds);
+        }
     }
 
     private static Product MapProduct(string[] fields, decimal code)
@@ -168,9 +199,6 @@ public class CsvController
 
             IngredientsTags = CsvSchema.Get(fields, CsvSchema.Column.IngredientsTags),
             IngredientsText = CsvSchema.Get(fields, CsvSchema.Column.IngredientsText),
-            AllergensEn = CsvSchema.Get(fields, CsvSchema.Column.AllergensEn),
-            FoodGroupsEn = CsvSchema.Get(fields, CsvSchema.Column.FoodGroupsEn),
-            LabelsEn = CsvSchema.Get(fields, CsvSchema.Column.LabelsEn),
 
             Completeness = CsvSchema.GetDecimal(fields, CsvSchema.Column.Completeness),
             LastImageDatetime = CsvSchema.Get(fields, CsvSchema.Column.LastImageDatetime),

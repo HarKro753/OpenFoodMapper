@@ -1,5 +1,3 @@
-using OpenFood.Database.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace OpenFood;
 
@@ -129,6 +127,75 @@ public class Repository
             await _db.Database.ExecuteSqlRawAsync(
                 "INSERT INTO product_countries (product_code, country_id) VALUES ({0}, {1}) ON CONFLICT DO NOTHING",
                 productCode, countryId);
+        }
+    }
+
+    public async Task<Dictionary<string, int>> GetOrCreateAllergensAsync(List<string> allergenNames)
+    {
+        foreach (var name in allergenNames)
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO allergens (name) VALUES ({0}) ON CONFLICT (name) DO NOTHING", name);
+        }
+
+        return await _db.Allergens
+            .Where(a => allergenNames.Contains(a.Name))
+            .ToDictionaryAsync(a => a.Name, a => a.Id);
+    }
+
+    public async Task<Dictionary<string, int>> GetOrCreateFoodGroupsAsync(List<string> foodGroupNames)
+    {
+        foreach (var name in foodGroupNames)
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO food_groups (name) VALUES ({0}) ON CONFLICT (name) DO NOTHING", name);
+        }
+
+        return await _db.FoodGroups
+            .Where(f => foodGroupNames.Contains(f.Name))
+            .ToDictionaryAsync(f => f.Name, f => f.Id);
+    }
+
+    public async Task<Dictionary<string, int>> GetOrCreateLabelsAsync(List<string> labelNames)
+    {
+        foreach (var name in labelNames)
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO labels (name) VALUES ({0}) ON CONFLICT (name) DO NOTHING", name);
+        }
+
+        return await _db.Labels
+            .Where(l => labelNames.Contains(l.Name))
+            .ToDictionaryAsync(l => l.Name, l => l.Id);
+    }
+
+    public async Task LinkProductAllergensAsync(decimal productCode, List<int> allergenIds)
+    {
+        foreach (var allergenId in allergenIds)
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO product_allergens (product_code, allergen_id) VALUES ({0}, {1}) ON CONFLICT DO NOTHING",
+                productCode, allergenId);
+        }
+    }
+
+    public async Task LinkProductFoodGroupsAsync(decimal productCode, List<int> foodGroupIds)
+    {
+        foreach (var foodGroupId in foodGroupIds)
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO product_food_groups (product_code, food_group_id) VALUES ({0}, {1}) ON CONFLICT DO NOTHING",
+                productCode, foodGroupId);
+        }
+    }
+
+    public async Task LinkProductLabelsAsync(decimal productCode, List<int> labelIds)
+    {
+        foreach (var labelId in labelIds)
+        {
+            await _db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO product_labels (product_code, label_id) VALUES ({0}, {1}) ON CONFLICT DO NOTHING",
+                productCode, labelId);
         }
     }
 }

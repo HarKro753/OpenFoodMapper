@@ -16,9 +16,6 @@ public class Product
     // Ingredients
     public string? IngredientsTags { get; set; }
     public string? IngredientsText { get; set; }
-    public string? AllergensEn { get; set; }
-    public string? FoodGroupsEn { get; set; }
-    public string? LabelsEn { get; set; }
 
     // Data Quality (use to filter for good results)
     public decimal? Completeness { get; set; } 
@@ -152,4 +149,7 @@ public class Product
     public ICollection<ProductAdditive> ProductAdditives { get; set; } = new List<ProductAdditive>();
     public ICollection<ProductIngredient> ProductIngredients { get; set; } = new List<ProductIngredient>();
     public ICollection<ProductCountry> ProductCountries { get; set; } = new List<ProductCountry>();
+    public ICollection<ProductAllergen> ProductAllergens { get; set; } = new List<ProductAllergen>();
+    public ICollection<ProductFoodGroup> ProductFoodGroups { get; set; } = new List<ProductFoodGroup>();
+    public ICollection<ProductLabel> ProductLabels { get; set; } = new List<ProductLabel>();
 }

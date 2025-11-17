@@ -1,14 +1,9 @@
-using Microsoft.EntityFrameworkCore;
-
 namespace OpenFood.Database.Models;
 
 public class DatabaseContext : DbContext
 {
-    private readonly Config _config;
-
-    public DatabaseContext(Config config)
+    public DatabaseContext(DbContextOptions<DatabaseContext> options) : base(options)
     {
-        _config = config;
     }
 
     public DbSet<Product> Products { get; set; }
@@ -23,19 +18,12 @@ public class DatabaseContext : DbContext
     public DbSet<ProductIngredient> ProductIngredients { get; set; } = null!;
     public DbSet<Country> Countries { get; set; }
     public DbSet<ProductCountry> ProductCountries { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        if (!optionsBuilder.IsConfigured)
-        {
-            optionsBuilder.UseNpgsql(_config.ConnectionString);
-        }
-    }
-
-    public async Task CreateTableAsync()
-    {
-        await Database.EnsureCreatedAsync();
-    }
+    public DbSet<Allergen> Allergens { get; set; }
+    public DbSet<ProductAllergen> ProductAllergens { get; set; }
+    public DbSet<FoodGroup> FoodGroups { get; set; }
+    public DbSet<ProductFoodGroup> ProductFoodGroups { get; set; }
+    public DbSet<Label> Labels { get; set; }
+    public DbSet<ProductLabel> ProductLabels { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,10 +54,7 @@ public class DatabaseContext : DbContext
 
             // Ingredients
             entity.Property(e => e.IngredientsTags).HasColumnName("ingredients_tags");
-            entity.Property(e => e.LabelsEn).HasColumnName("labels_en");
             entity.Property(e => e.IngredientsText).HasColumnName("ingredients_text");
-            entity.Property(e => e.AllergensEn).HasColumnName("allergens_en");
-            entity.Property(e => e.FoodGroupsEn).HasColumnName("food_groups_en");
 
             // Nutrients per 100g
             entity.Property(e => e.EnergyKcal100g).HasColumnName("energy-kcal_100g");
@@ -373,6 +358,102 @@ public class DatabaseContext : DbContext
 
             entity.HasIndex(pc => pc.CountryId)
                 .HasDatabaseName("idx_product_countries_country");
+        });
+
+        modelBuilder.Entity<Allergen>(entity =>
+        {
+            entity.ToTable("allergens");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").IsRequired();
+
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductAllergen>(entity =>
+        {
+            entity.ToTable("product_allergens");
+            entity.HasKey(e => new { e.ProductCode, e.AllergenId });
+
+            entity.Property(e => e.ProductCode).HasColumnName("product_code");
+            entity.Property(e => e.AllergenId).HasColumnName("allergen_id");
+
+            entity.HasOne(e => e.Product)
+                .WithMany(e => e.ProductAllergens)
+                .HasForeignKey(e => e.ProductCode)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Allergen)
+                .WithMany(e => e.ProductAllergens)
+                .HasForeignKey(e => e.AllergenId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.AllergenId).HasDatabaseName("idx_product_allergens_allergen");
+        });
+
+        modelBuilder.Entity<FoodGroup>(entity =>
+        {
+            entity.ToTable("food_groups");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").IsRequired();
+
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductFoodGroup>(entity =>
+        {
+            entity.ToTable("product_food_groups");
+            entity.HasKey(e => new { e.ProductCode, e.FoodGroupId });
+
+            entity.Property(e => e.ProductCode).HasColumnName("product_code");
+            entity.Property(e => e.FoodGroupId).HasColumnName("food_group_id");
+
+            entity.HasOne(e => e.Product)
+                .WithMany(e => e.ProductFoodGroups)
+                .HasForeignKey(e => e.ProductCode)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.FoodGroup)
+                .WithMany(e => e.ProductFoodGroups)
+                .HasForeignKey(e => e.FoodGroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.FoodGroupId).HasDatabaseName("idx_product_food_groups_food_group");
+        });
+
+        modelBuilder.Entity<Label>(entity =>
+        {
+            entity.ToTable("labels");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name).HasColumnName("name").IsRequired();
+
+            entity.HasIndex(e => e.Name).IsUnique();
+        });
+
+        modelBuilder.Entity<ProductLabel>(entity =>
+        {
+            entity.ToTable("product_labels");
+            entity.HasKey(e => new { e.ProductCode, e.LabelId });
+
+            entity.Property(e => e.ProductCode).HasColumnName("product_code");
+            entity.Property(e => e.LabelId).HasColumnName("label_id");
+
+            entity.HasOne(e => e.Product)
+                .WithMany(e => e.ProductLabels)
+                .HasForeignKey(e => e.ProductCode)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Label)
+                .WithMany(e => e.ProductLabels)
+                .HasForeignKey(e => e.LabelId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.LabelId).HasDatabaseName("idx_product_labels_label");
         });
     }
 }
