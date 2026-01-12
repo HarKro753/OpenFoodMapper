@@ -1,0 +1,30 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      - name: Determine version
+        id: version
+        run: |
+          echo "tag=openfood-mapper-latest" >> $GITHUB_OUTPUT
+          echo "Building latest from main branch"
+
+      - name: Build and push container
+        run: |
+          echo "dckr_pat_HZKogOwSRxsnY-aDBI7ag82UecM" | docker login -u "harkro123" --password-stdin
+          dotnet publish OpenFoodUploader.csproj --os linux --arch x64 -c Release /t:PublishContainer -p ContainerRegistry=docker.io -p ContainerRepository=harkro123/food-facts -p ContainerImageTag=${{ steps.version.outputs.tag }}
+          docker logout
