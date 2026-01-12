@@ -51,7 +51,7 @@ public class R2FileDownloader
         int firstChar = index / 26;
         int secondChar = index % 26;
 
-        return $"part_{(char)('a' + firstChar)}{(char)('a' + secondChar)}.csv";
+        return $"part_{(char)('a' + firstChar)}{(char)('a' + secondChar)}";
     }
 
     private class CustomHttpClientFactory : Amazon.Runtime.HttpClientFactory
