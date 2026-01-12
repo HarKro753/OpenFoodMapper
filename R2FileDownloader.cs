@@ -14,11 +14,17 @@ public class R2FileDownloader
         _config = config;
 
         var credentials = new BasicAWSCredentials(_config.AccessKeyId, _config.SecretAccessKey);
+
         var s3Config = new AmazonS3Config
         {
             ServiceURL = _config.ServiceUrl,
-            ForcePathStyle = true
+            ForcePathStyle = true,
+            UseHttp = false,
+            MaxErrorRetry = 3
         };
+
+        System.Net.ServicePointManager.ServerCertificateValidationCallback =
+            (sender, certificate, chain, sslPolicyErrors) => true;
 
         _s3Client = new AmazonS3Client(credentials, s3Config);
     }
