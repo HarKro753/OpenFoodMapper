@@ -1,4 +1,3 @@
-
 namespace OpenFood;
 
 public class CsvController
