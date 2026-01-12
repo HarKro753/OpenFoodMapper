@@ -3,39 +3,41 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console(new CompactJsonFormatter())
     .CreateLogger();
 
-var builder = Host.CreateApplicationBuilder(args);
-
-builder.Services.AddSerilog();
-
-var config = new Config
-{
-    BatchSize = builder.Configuration.GetValue<int>("AppSettings:BatchSize")
-};
-
-var r2Config = new R2Config
-{
-    ApiBaseUri = builder.Configuration["R2:ApiBaseUri"] ?? string.Empty,
-    AccountId = builder.Configuration["R2:AccountId"] ?? string.Empty,
-    AccessKey = builder.Configuration["R2:AccessKey"] ?? string.Empty,
-    SecretKey = builder.Configuration["R2:SecretKey"] ?? string.Empty,
-    BucketName = builder.Configuration["R2:BucketName"] ?? string.Empty
-};
-
-builder.Services.AddDbContext<DatabaseContext>(options =>
-{
-    var connectionString = builder.Configuration["ConnectionStrings:DefaultConnection"];
-    options.UseNpgsql(connectionString);
-});
-
-builder.Services.AddSingleton(config);
-builder.Services.AddTransient<Repository>();
-
-var host = builder.Build();
-
-Log.Information("Starting Process");
+Log.Information("Application wrapper started");
+Console.WriteLine("Native Console: App Starting");
 
 try
 {
+    var builder = Host.CreateApplicationBuilder(args);
+
+    builder.Services.AddSerilog();
+
+    var config = new Config
+    {
+        BatchSize = builder.Configuration.GetValue<int>("AppSettings:BatchSize")
+    };
+
+    var r2Config = new R2Config
+    {
+        ApiBaseUri = builder.Configuration["R2:ApiBaseUri"] ?? string.Empty,
+        AccountId = builder.Configuration["R2:AccountId"] ?? string.Empty,
+        AccessKey = builder.Configuration["R2:AccessKey"] ?? string.Empty,
+        SecretKey = builder.Configuration["R2:SecretKey"] ?? string.Empty,
+        BucketName = builder.Configuration["R2:BucketName"] ?? string.Empty
+    };
+
+    builder.Services.AddDbContext<DatabaseContext>(options =>
+    {
+        var connectionString = builder.Configuration["ConnectionStrings:DefaultConnection"];
+        options.UseNpgsql(connectionString);
+    });
+
+    builder.Services.AddSingleton(config);
+    builder.Services.AddTransient<Repository>();
+
+    var host = builder.Build();
+
+    Log.Information("Starting Process");
     string? indexStr = Environment.GetEnvironmentVariable("JOB_COMPLETION_INDEX");
 
     if (string.IsNullOrEmpty(indexStr) || !int.TryParse(indexStr, out int index))
