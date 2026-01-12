@@ -17,13 +17,15 @@ try
         BatchSize = builder.Configuration.GetValue<int>("AppSettings:BatchSize")
     };
 
-    var r2Config = new R2Config
+    var connectionString = builder.Configuration["AzureStorage:ConnectionString"] 
+        ?? throw new InvalidOperationException("Configuration 'AzureStorage:ConnectionString' is missing.");
+    var containerName = builder.Configuration["AzureStorage:ContainerName"] 
+        ?? throw new InvalidOperationException("Configuration 'AzureStorage:ContainerName' is missing.");
+
+    var azureConfig = new AzureConfig
     {
-        ApiBaseUri = builder.Configuration["R2:ApiBaseUri"] ?? string.Empty,
-        AccountId = builder.Configuration["R2:AccountId"] ?? string.Empty,
-        AccessKey = builder.Configuration["R2:AccessKey"] ?? string.Empty,
-        SecretKey = builder.Configuration["R2:SecretKey"] ?? string.Empty,
-        BucketName = builder.Configuration["R2:BucketName"] ?? string.Empty
+        ConnectionString = connectionString,
+        ContainerName = containerName
     };
 
     builder.Services.AddDbContext<DatabaseContext>(options =>
@@ -46,10 +48,10 @@ try
         return;
     }
 
-    string fileName = R2FileDownloader.IndexToFileName(index);
+    string fileName = AzureFileDownloader.IndexToFileName(index);
     string localPath = Path.Combine(Path.GetTempPath(), fileName);
 
-    var downloader = new R2FileDownloader(r2Config);
+    var downloader = new AzureFileDownloader(azureConfig);
     string? downloadedFile = await downloader.DownloadFileAsync(fileName, localPath);
 
     if (downloadedFile == null)
