@@ -1,8 +1,14 @@
+using Serilog;
+using Serilog.Formatting.Compact;
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Error()
+    .WriteTo.Console(new CompactJsonFormatter())
+    .CreateLogger();
+
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
-builder.Logging.AddFilter((category, level) => level >= LogLevel.Error);
+builder.Services.AddSerilog();
 
 var config = new Config
 {
@@ -35,7 +41,7 @@ try
 
     if (string.IsNullOrEmpty(indexStr) || !int.TryParse(indexStr, out int index))
     {
-        Console.WriteLine("No valid JOB_COMPLETION_INDEX found");
+        Log.Error("No valid JOB_COMPLETION_INDEX found");
         return;
     }
 
@@ -47,7 +53,7 @@ try
 
     if (downloadedFile == null)
     {
-        Console.WriteLine($"File {fileName} not found in R2");
+        Log.Error("File {FileName} not found in R2", fileName);
         return;
     }
 
@@ -62,9 +68,13 @@ try
         File.Delete(localPath);
     }
 
-    Console.WriteLine("Processing completed");
+    Log.Information("Processing completed");
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"Error: {ex.Message}");
+    Log.Fatal(ex, "An error occurred during processing");
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
 }
