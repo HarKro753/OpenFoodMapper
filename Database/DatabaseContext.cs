@@ -29,6 +29,7 @@ public class DatabaseContext : DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<ProductHistory> ProductHistories { get; set; }
     public DbSet<UserFavoriteProduct> UserFavoriteProducts { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -174,6 +175,12 @@ public class DatabaseContext : DbContext
 
             // Fruits/Vegetables
             entity.Property(e => e.FruitsVegetablesNutsEstimateFromIngredients100g).HasColumnName("fruits_vegetables_nuts_estimate_from_ingredients_100g");
+
+            // GIN index for fast prefix search (requires pg_trgm extension)
+            entity.HasIndex(e => e.ProductName)
+                .HasDatabaseName("idx_products_product_name_gin")
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
         });
 
         modelBuilder.Entity<Category>(entity =>
@@ -184,7 +191,12 @@ public class DatabaseContext : DbContext
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Name).HasColumnName("name").IsRequired();
 
-            entity.HasIndex(e => e.Name).IsUnique();
+            // Unique index for integrity, plus GIN for fast prefix search
+            entity.HasIndex(e => e.Name).IsUnique().HasDatabaseName("idx_categories_name_unique");
+            entity.HasIndex(e => e.Name)
+                .HasDatabaseName("idx_categories_name_gin")
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
         });
 
         modelBuilder.Entity<ProductCategory>(entity =>
@@ -407,7 +419,12 @@ public class DatabaseContext : DbContext
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Name).HasColumnName("name").IsRequired();
 
-            entity.HasIndex(e => e.Name).IsUnique();
+            // Unique index for integrity, plus GIN for fast prefix search
+            entity.HasIndex(e => e.Name).IsUnique().HasDatabaseName("idx_food_groups_name_unique");
+            entity.HasIndex(e => e.Name)
+                .HasDatabaseName("idx_food_groups_name_gin")
+                .HasMethod("gin")
+                .HasOperators("gin_trgm_ops");
         });
 
         modelBuilder.Entity<ProductFoodGroup>(entity =>
@@ -471,7 +488,16 @@ public class DatabaseContext : DbContext
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Username).HasColumnName("username").IsRequired();
             entity.Property(e => e.Email).HasColumnName("email").IsRequired();
-            entity.Property(e => e.PasswordHash).HasColumnName("password_hash").IsRequired();
+            entity.Property(e => e.AppleId).HasColumnName("apple_id");
+            // Activity
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
+            entity.Property(e => e.LastLoginAt).HasColumnName("last_login_at");
+            // Revenuecat
+            entity.Property(e => e.RevenuecatId).HasColumnName("revenuecat_id");
+            entity.Property(e => e.IsPremium).HasColumnName("is_premium").HasDefaultValue(false);
+            entity.Property(e => e.PremiumExpiration).HasColumnName("premium_expiration");
+            entity.Property(e => e.LastRevenuecatEvent).HasColumnName("last_revenuecat_event");
 
             entity.HasIndex(e => e.Username).IsUnique();
             entity.HasIndex(e => e.Email).IsUnique();
@@ -523,6 +549,29 @@ public class DatabaseContext : DbContext
 
             entity.HasIndex(e => e.ProductCode);
             entity.HasIndex(e => e.FavoritedAt);
+        });
+    
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.ToTable("refresh_tokens");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.Token).HasColumnName("token").IsRequired();
+            entity.Property(e => e.ExpiresAt).HasColumnName("expires_at");
+            entity.Property(e => e.CreatedAt).HasColumnName("created_at");
+            entity.Property(e => e.IsRevoked).HasColumnName("is_revoked");
+            entity.Property(e => e.RevokedAt).HasColumnName("revoked_at");
+            entity.Property(e => e.ReplacedByToken).HasColumnName("replaced_by_token");
+
+            entity.HasOne(e => e.User)
+                .WithMany()
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => e.Token).IsUnique();
+            entity.HasIndex(e => e.UserId);
         });
     }
 }
