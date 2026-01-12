@@ -11,84 +11,68 @@ public class CsvController
         _config = config;
     }
 
-    public async Task<(bool Success, string FileName)> ProcessFileAsync(string filePath, int fileIndex, int totalFiles)
+    public async Task ProcessFileAsync(string filePath)
     {
-        var fileName = Path.GetFileName(filePath);
+        var products = new List<Product>();
+        var categoriesMap = new Dictionary<decimal, List<string>>();
+        var additivesMap = new Dictionary<decimal, List<string>>();
+        var ingredientsMap = new Dictionary<decimal, List<string>>();
+        var countriesMap = new Dictionary<decimal, List<string>>();
+        var allergensMap = new Dictionary<decimal, List<string>>();
+        var foodGroupsMap = new Dictionary<decimal, List<string>>();
+        var labelsMap = new Dictionary<decimal, List<string>>();
 
-        try
+        await foreach (var line in File.ReadLinesAsync(filePath))
         {
-            Console.WriteLine($"[{fileIndex}/{totalFiles}] Processing {fileName}...");
+            if (string.IsNullOrWhiteSpace(line)) continue;
 
-            var products = new List<Product>();
-            var categoriesMap = new Dictionary<decimal, List<string>>();
-            var additivesMap = new Dictionary<decimal, List<string>>();
-            var ingredientsMap = new Dictionary<decimal, List<string>>();
-            var countriesMap = new Dictionary<decimal, List<string>>();
-            var allergensMap = new Dictionary<decimal, List<string>>();
-            var foodGroupsMap = new Dictionary<decimal, List<string>>();
-            var labelsMap = new Dictionary<decimal, List<string>>();
+            var fields = ParseCsvLine(line);
+            if (fields.Length < 10) continue;
 
-            await foreach (var line in File.ReadLinesAsync(filePath))
-            {
-                if (string.IsNullOrWhiteSpace(line)) continue;
+            var codeStr = CsvSchema.Get(fields, CsvSchema.Column.Code);
+            if (codeStr == null || !decimal.TryParse(codeStr, out var code)) continue;
 
-                var fields = ParseCsvLine(line);
-                if (fields.Length < 10) continue;
+            var product = MapProduct(fields, code);
+            products.Add(product);
 
-                var codeStr = CsvSchema.Get(fields, CsvSchema.Column.Code);
-                if (codeStr == null || !decimal.TryParse(codeStr, out var code)) continue;
+            var categories = CsvSchema.GetList(fields, CsvSchema.Column.CategoriesEn);
+            if (categories.Count > 0) categoriesMap[code] = categories;
 
-                var product = MapProduct(fields, code);
-                products.Add(product);
+            var additives = CsvSchema.GetList(fields, CsvSchema.Column.AdditivesTags);
+            if (additives.Count > 0) additivesMap[code] = additives;
 
-                var categories = CsvSchema.GetList(fields, CsvSchema.Column.CategoriesEn);
-                if (categories.Count > 0) categoriesMap[code] = categories;
+            var ingredients = CsvSchema.GetList(fields, CsvSchema.Column.IngredientsTags);
+            if (ingredients.Count > 0) ingredientsMap[code] = ingredients;
 
-                var additives = CsvSchema.GetList(fields, CsvSchema.Column.AdditivesTags);
-                if (additives.Count > 0) additivesMap[code] = additives;
+            var countries = CsvSchema.GetList(fields, CsvSchema.Column.CountriesEn);
+            if (countries.Count > 0) countriesMap[code] = countries;
 
-                var ingredients = CsvSchema.GetList(fields, CsvSchema.Column.IngredientsTags);
-                if (ingredients.Count > 0) ingredientsMap[code] = ingredients;
+            var allergens = CsvSchema.GetList(fields, CsvSchema.Column.AllergensEn);
+            if (allergens.Count > 0) allergensMap[code] = allergens;
 
-                var countries = CsvSchema.GetList(fields, CsvSchema.Column.CountriesEn);
-                if (countries.Count > 0) countriesMap[code] = countries;
+            var foodGroups = CsvSchema.GetList(fields, CsvSchema.Column.FoodGroupsEn);
+            if (foodGroups.Count > 0) foodGroupsMap[code] = foodGroups;
 
-                var allergens = CsvSchema.GetList(fields, CsvSchema.Column.AllergensEn);
-                if (allergens.Count > 0) allergensMap[code] = allergens;
+            var labels = CsvSchema.GetList(fields, CsvSchema.Column.LabelsEn);
+            if (labels.Count > 0) labelsMap[code] = labels;
 
-                var foodGroups = CsvSchema.GetList(fields, CsvSchema.Column.FoodGroupsEn);
-                if (foodGroups.Count > 0) foodGroupsMap[code] = foodGroups;
-
-                var labels = CsvSchema.GetList(fields, CsvSchema.Column.LabelsEn);
-                if (labels.Count > 0) labelsMap[code] = labels;
-
-                if (products.Count >= _config.BatchSize)
-                {
-                    await ProcessBatchAsync(products, categoriesMap, additivesMap, ingredientsMap, countriesMap, allergensMap, foodGroupsMap, labelsMap);
-                    products.Clear();
-                    categoriesMap.Clear();
-                    additivesMap.Clear();
-                    ingredientsMap.Clear();
-                    countriesMap.Clear();
-                    allergensMap.Clear();
-                    foodGroupsMap.Clear();
-                    labelsMap.Clear();
-                }
-            }
-
-            if (products.Count > 0)
+            if (products.Count >= _config.BatchSize)
             {
                 await ProcessBatchAsync(products, categoriesMap, additivesMap, ingredientsMap, countriesMap, allergensMap, foodGroupsMap, labelsMap);
+                products.Clear();
+                categoriesMap.Clear();
+                additivesMap.Clear();
+                ingredientsMap.Clear();
+                countriesMap.Clear();
+                allergensMap.Clear();
+                foodGroupsMap.Clear();
+                labelsMap.Clear();
             }
-
-            Console.WriteLine($"[{fileIndex}/{totalFiles}] {fileName} completed");
-
-            return (true, fileName);
         }
-        catch (Exception ex)
+
+        if (products.Count > 0)
         {
-            Console.WriteLine($"[{fileIndex}/{totalFiles}] {fileName} failed: {ex.Message}");
-            return (false, fileName);
+            await ProcessBatchAsync(products, categoriesMap, additivesMap, ingredientsMap, countriesMap, allergensMap, foodGroupsMap, labelsMap);
         }
     }
 

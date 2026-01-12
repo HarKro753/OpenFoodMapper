@@ -2,8 +2,14 @@ namespace OpenFood;
 
 public class Config
 {
-    public int MaxWorkers { get; set; }
-    public int MaxFiles { get; set; }
-    public string DataFolder { get; set; } = string.Empty;
     public int BatchSize { get; set; }
+}
+
+public class R2Config
+{
+    public string AccessKeyId { get; set; } = string.Empty;
+    public string SecretAccessKey { get; set; } = string.Empty;
+    public string BucketName { get; set; } = string.Empty;
+    public string Token { get; set; } = string.Empty;
+    public string ServiceUrl { get; set; } = string.Empty;
 }

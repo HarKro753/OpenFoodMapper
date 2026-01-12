@@ -6,10 +6,16 @@ builder.Logging.AddFilter((category, level) => level >= LogLevel.Error);
 
 var config = new Config
 {
-    MaxWorkers = builder.Configuration.GetValue<int>("AppSettings:MaxWorkers"),
-    MaxFiles = builder.Configuration.GetValue<int>("AppSettings:MaxFiles"),
-    DataFolder = builder.Configuration.GetValue<string>("AppSettings:DataFolder") ?? "Food",
     BatchSize = builder.Configuration.GetValue<int>("AppSettings:BatchSize")
+};
+
+var r2Config = new R2Config
+{
+    AccessKeyId = builder.Configuration["R2:AccessKeyId"] ?? string.Empty,
+    SecretAccessKey = builder.Configuration["R2:SecretAccessKey"] ?? string.Empty,
+    BucketName = builder.Configuration["R2:BucketName"] ?? string.Empty,
+    Token = builder.Configuration["R2:Token"] ?? string.Empty,
+    ServiceUrl = builder.Configuration["R2:ServiceUrl"] ?? string.Empty
 };
 
 builder.Services.AddDbContext<DatabaseContext>(options =>
@@ -25,61 +31,40 @@ var host = builder.Build();
 
 try
 {
-    var allFiles = Directory.GetFiles(config.DataFolder, "part_*")
-        .OrderBy(f => f)
-        .ToArray();
+    string? indexStr = Environment.GetEnvironmentVariable("JOB_COMPLETION_INDEX");
 
-    if (allFiles.Length == 0)
+    if (string.IsNullOrEmpty(indexStr) || !int.TryParse(indexStr, out int index))
     {
-        Console.WriteLine($"ERROR: No files found in {config.DataFolder}/ folder!");
+        Console.WriteLine("No valid JOB_COMPLETION_INDEX found");
         return;
     }
 
-    var csvFiles = config.MaxFiles > 0
-        ? allFiles.Take(config.MaxFiles).ToArray()
-        : allFiles;
+    string fileName = R2FileDownloader.IndexToFileName(index);
+    string localPath = Path.Combine(Path.GetTempPath(), fileName);
 
-    var semaphore = new SemaphoreSlim(config.MaxWorkers);
+    var downloader = new R2FileDownloader(r2Config);
+    string? downloadedFile = await downloader.DownloadFileAsync(fileName, localPath);
 
-    var tasks = csvFiles.Select(async (file, index) =>
+    if (downloadedFile == null)
     {
-        await semaphore.WaitAsync();
-        try
-        {
-            using var scope = host.Services.CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<DatabaseContext>();
-            var repository = scope.ServiceProvider.GetRequiredService<Repository>();
-            var csvController = new CsvController(repository, config);
-
-            return await csvController.ProcessFileAsync(file, index + 1, csvFiles.Length);
-        }
-        finally
-        {
-            semaphore.Release();
-        }
-    }).ToArray();
-
-    var results = await Task.WhenAll(tasks);
-    var failedFiles = results.Where(r => !r.Success).Select(r => r.FileName).ToList();
-
-    Console.WriteLine("\n" + new string('=', 80));
-    Console.WriteLine("UPLOAD SUMMARY");
-    Console.WriteLine(new string('=', 80));
-    Console.WriteLine($"Successful files: {results.Count(r => r.Success)}/{csvFiles.Length}");
-
-    if (failedFiles.Count > 0)
-    {
-        Console.WriteLine($"\nFailed files ({failedFiles.Count}):");
-        foreach (var file in failedFiles)
-            Console.WriteLine($"  - {file}");
+        Console.WriteLine($"File {fileName} not found in R2");
+        return;
     }
-    else
+
+    using var scope = host.Services.CreateScope();
+    var repository = scope.ServiceProvider.GetRequiredService<Repository>();
+    var csvController = new CsvController(repository, config);
+
+    await csvController.ProcessFileAsync(downloadedFile);
+
+    if (File.Exists(localPath))
     {
-        Console.WriteLine("\nAll files uploaded successfully!");
+        File.Delete(localPath);
     }
+
+    Console.WriteLine("Processing completed");
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"\nFATAL ERROR: {ex.Message}");
-    Console.WriteLine(ex.StackTrace);
+    Console.WriteLine($"Error: {ex.Message}");
 }
