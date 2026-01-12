@@ -16,7 +16,8 @@ var r2Config = new R2Config
 {
     ApiBaseUri = builder.Configuration["R2:ApiBaseUri"] ?? string.Empty,
     AccountId = builder.Configuration["R2:AccountId"] ?? string.Empty,
-    ApiToken = builder.Configuration["R2:ApiToken"] ?? string.Empty,
+    AccessKey = builder.Configuration["R2:AccessKey"] ?? string.Empty,
+    SecretKey = builder.Configuration["R2:SecretKey"] ?? string.Empty,
     BucketName = builder.Configuration["R2:BucketName"] ?? string.Empty
 };
 

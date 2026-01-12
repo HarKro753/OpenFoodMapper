@@ -3,40 +3,41 @@ namespace OpenFood;
 public class R2FileDownloader
 {
     private readonly R2Config _config;
-    private readonly CloudflareR2Client _r2Client;
+    private readonly AmazonS3Client _s3Client;
 
     public R2FileDownloader(R2Config config)
     {
         _config = config;
 
-        var options = Options.Create(new CloudflareR2Options
+        var s3Config = new AmazonS3Config
         {
-            ApiBaseUri = _config.ApiBaseUri,
-            AccountId = _config.AccountId,
-            ApiToken = _config.ApiToken
-        });
-
-        var handler = new HttpClientHandler
-        {
-            ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+            ServiceURL = _config.ApiBaseUri,
+            ForcePathStyle = true, // R2 often requires path style access or specific domain config
+            HttpClientFactory = new CustomHttpClientFactory()
         };
-        var httpClient = new HttpClient(handler);
-        _r2Client = new CloudflareR2Client(httpClient, options);
+
+        var credentials = new BasicAWSCredentials(_config.AccessKey, _config.SecretKey);
+        _s3Client = new AmazonS3Client(credentials, s3Config);
     }
 
     public async Task<string?> DownloadFileAsync(string fileName, string localPath)
     {
         try
         {
-            var blobPath = $"{_config.BucketName}/{fileName}";
-            using var blobStream = await _r2Client.GetBlobAsync(blobPath, CancellationToken.None);
+            var request = new GetObjectRequest
+            {
+                BucketName = _config.BucketName,
+                Key = fileName
+            };
 
+            using var response = await _s3Client.GetObjectAsync(request);
+            
             using var fileStream = new FileStream(localPath, FileMode.Create, FileAccess.Write, FileShare.None);
-            await blobStream.CopyToAsync(fileStream);
+            await response.ResponseStream.CopyToAsync(fileStream);
 
             return localPath;
         }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return null;
         }
@@ -51,5 +52,18 @@ public class R2FileDownloader
         int secondChar = index % 26;
 
         return $"part_{(char)('a' + firstChar)}{(char)('a' + secondChar)}.csv";
+    }
+
+    private class CustomHttpClientFactory : Amazon.Runtime.HttpClientFactory
+    {
+        public override HttpClient CreateHttpClient(IClientConfig clientConfig)
+        {
+            var handler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+            };
+            var client = new HttpClient(handler);
+            return client;
+        }
     }
 }
