@@ -1,50 +1,37 @@
 namespace OpenFood;
 
-using Amazon.S3;
-using Amazon.S3.Model;
-using Amazon.Runtime;
-
 public class R2FileDownloader
 {
     private readonly R2Config _config;
-    private readonly AmazonS3Client _s3Client;
+    private readonly CloudflareR2Client _r2Client;
 
     public R2FileDownloader(R2Config config)
     {
         _config = config;
 
-        var credentials = new BasicAWSCredentials(_config.AccessKeyId, _config.SecretAccessKey);
-
-        var s3Config = new AmazonS3Config
+        var options = Options.Create(new CloudflareR2Options
         {
-            ServiceURL = _config.ServiceUrl,
-            ForcePathStyle = true,
-            UseHttp = false,
-            MaxErrorRetry = 3
-        };
+            ApiBaseUri = _config.ApiBaseUri,
+            ApiToken = _config.ApiToken
+        });
 
-        System.Net.ServicePointManager.ServerCertificateValidationCallback =
-            (sender, certificate, chain, sslPolicyErrors) => true;
-
-        _s3Client = new AmazonS3Client(credentials, s3Config);
+        var logger = NullLogger<CloudflareR2Client>.Instance;
+        _r2Client = new CloudflareR2Client(_config.AccountId, options, logger);
     }
 
     public async Task<string?> DownloadFileAsync(string fileName, string localPath)
     {
         try
         {
-            var request = new GetObjectRequest
-            {
-                BucketName = _config.BucketName,
-                Key = fileName
-            };
+            var blobPath = $"{_config.BucketName}/{fileName}";
+            using var blobStream = await _r2Client.GetBlobAsync(blobPath, CancellationToken.None);
 
-            using var response = await _s3Client.GetObjectAsync(request);
-            await response.WriteResponseStreamToFileAsync(localPath, false, CancellationToken.None);
+            using var fileStream = new FileStream(localPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            await blobStream.CopyToAsync(fileStream);
 
             return localPath;
         }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return null;
         }

@@ -1,6 +1,3 @@
-using Serilog;
-using Serilog.Formatting.Compact;
-
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Error()
     .WriteTo.Console(new CompactJsonFormatter())
@@ -17,11 +14,10 @@ var config = new Config
 
 var r2Config = new R2Config
 {
-    AccessKeyId = builder.Configuration["R2:AccessKeyId"] ?? string.Empty,
-    SecretAccessKey = builder.Configuration["R2:SecretAccessKey"] ?? string.Empty,
-    BucketName = builder.Configuration["R2:BucketName"] ?? string.Empty,
-    Token = builder.Configuration["R2:Token"] ?? string.Empty,
-    ServiceUrl = builder.Configuration["R2:ServiceUrl"] ?? string.Empty
+    ApiBaseUri = builder.Configuration["R2:ApiBaseUri"] ?? string.Empty,
+    AccountId = builder.Configuration["R2:AccountId"] ?? string.Empty,
+    ApiToken = builder.Configuration["R2:ApiToken"] ?? string.Empty,
+    BucketName = builder.Configuration["R2:BucketName"] ?? string.Empty
 };
 
 builder.Services.AddDbContext<DatabaseContext>(options =>

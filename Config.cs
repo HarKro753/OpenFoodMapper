@@ -7,9 +7,8 @@ public class Config
 
 public class R2Config
 {
-    public string AccessKeyId { get; set; } = string.Empty;
-    public string SecretAccessKey { get; set; } = string.Empty;
+    public string ApiBaseUri { get; set; } = string.Empty;
+    public string AccountId { get; set; } = string.Empty;
+    public string ApiToken { get; set; } = string.Empty;
     public string BucketName { get; set; } = string.Empty;
-    public string Token { get; set; } = string.Empty;
-    public string ServiceUrl { get; set; } = string.Empty;
 }
