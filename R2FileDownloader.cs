@@ -12,11 +12,16 @@ public class R2FileDownloader
         var options = Options.Create(new CloudflareR2Options
         {
             ApiBaseUri = _config.ApiBaseUri,
+            AccountId = _config.AccountId,
             ApiToken = _config.ApiToken
         });
 
-        var logger = NullLogger<CloudflareR2Client>.Instance;
-        _r2Client = new CloudflareR2Client(_config.AccountId, options, logger);
+        var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+        };
+        var httpClient = new HttpClient(handler);
+        _r2Client = new CloudflareR2Client(httpClient, options);
     }
 
     public async Task<string?> DownloadFileAsync(string fileName, string localPath)
