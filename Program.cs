@@ -35,6 +35,8 @@ builder.Services.AddTransient<Repository>();
 
 var host = builder.Build();
 
+Log.Information("Starting Process");
+
 try
 {
     string? indexStr = Environment.GetEnvironmentVariable("JOB_COMPLETION_INDEX");
