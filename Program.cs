@@ -1,3 +1,7 @@
+// Bypass SSL certificate validation globally
+System.Net.ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Error()
     .WriteTo.Console(new CompactJsonFormatter())
