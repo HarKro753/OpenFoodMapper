@@ -17,15 +17,21 @@ try
         BatchSize = builder.Configuration.GetValue<int>("AppSettings:BatchSize")
     };
 
-    var connectionString = builder.Configuration["AzureStorage:ConnectionString"] 
-        ?? throw new InvalidOperationException("Configuration 'AzureStorage:ConnectionString' is missing.");
-    var containerName = builder.Configuration["AzureStorage:ContainerName"] 
-        ?? throw new InvalidOperationException("Configuration 'AzureStorage:ContainerName' is missing.");
+    var accessKey = builder.Configuration["Minio:AccessKey"] 
+        ?? throw new InvalidOperationException("Configuration 'Minio:AccessKey' is missing.");
+    var secretKey = builder.Configuration["Minio:SecretKey"] 
+        ?? throw new InvalidOperationException("Configuration 'Minio:SecretKey' is missing.");
+    var endpoint = builder.Configuration["Minio:Endpoint"] 
+        ?? throw new InvalidOperationException("Configuration 'Minio:Endpoint' is missing.");
+    var bucketName = builder.Configuration["Minio:BucketName"] 
+        ?? throw new InvalidOperationException("Configuration 'Minio:BucketName' is missing.");
 
-    var azureConfig = new AzureConfig
+    var minioConfig = new MinioConfig
     {
-        ConnectionString = connectionString,
-        ContainerName = containerName
+        AccessKey = accessKey,
+        SecretKey = secretKey,
+        Endpoint = endpoint,
+        BucketName = bucketName
     };
 
     builder.Services.AddDbContext<DatabaseContext>(options =>
@@ -48,10 +54,10 @@ try
         return;
     }
 
-    string fileName = AzureFileDownloader.IndexToFileName(index);
+    string fileName = MinioFileDownloader.IndexToFileName(index);
     string localPath = Path.Combine(Path.GetTempPath(), fileName);
 
-    var downloader = new AzureFileDownloader(azureConfig);
+    var downloader = new MinioFileDownloader(minioConfig);
     string? downloadedFile = await downloader.DownloadFileAsync(fileName, localPath);
 
     if (downloadedFile == null)
