@@ -35,10 +35,10 @@ try
     };
 
     var graphQLEndpoint = builder.Configuration["GraphQL:Endpoint"]
-        ?? "http://192.168.178.151:8080/graphql";
+        ?? throw new InvalidOperationException("Configuration 'GraphQl:Endpoint' is missing.");
 
     builder.Services.AddSingleton(config);
-    builder.Services.AddSingleton(new GraphQL.GraphQLService(graphQLEndpoint));
+    builder.Services.AddSingleton(new OpenFood.GraphQL.GraphQLService(graphQLEndpoint));
 
     var host = builder.Build();
 
@@ -64,7 +64,7 @@ try
     }
 
     using var scope = host.Services.CreateScope();
-    var graphQLService = scope.ServiceProvider.GetRequiredService<GraphQL.GraphQLService>();
+    var graphQLService = scope.ServiceProvider.GetRequiredService<OpenFood.GraphQL.GraphQLService>();
     var csvController = new CsvController(graphQLService, config);
 
     await csvController.ProcessFileAsync(downloadedFile);
