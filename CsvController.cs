@@ -32,6 +32,12 @@ public class CsvController
             var codeStr = CsvSchema.Get(fields, CsvSchema.Column.Code);
             if (codeStr == null || !decimal.TryParse(codeStr, out var code)) continue;
 
+            // Log field count for debugging
+            if (fields.Length < 50)
+            {
+                Log.Warning("Product {Code}: Only {FieldCount} fields parsed (expected 214+)", code, fields.Length);
+            }
+
             var product = MapProductInput(fields, code);
             products.Add(product);
 
@@ -44,13 +50,17 @@ public class CsvController
             var countries = CsvSchema.GetList(fields, CsvSchema.Column.CountriesEn);
             if (countries.Count > 0) countriesMap[code] = countries;
 
+            // Debug allergens parsing
+            var allergenColumnIndex = (int)CsvSchema.Column.AllergensEn;
+            Log.Information("Product {Code}: Field count = {Count}, Allergen column index = {Index}, Value at index = [{Value}]",
+                code, fields.Length, allergenColumnIndex,
+                allergenColumnIndex < fields.Length ? fields[allergenColumnIndex] : "OUT_OF_BOUNDS");
+
             var allergensRaw = CsvSchema.Get(fields, CsvSchema.Column.AllergensEn);
             var allergens = CsvSchema.GetList(fields, CsvSchema.Column.AllergensEn);
-            if (!string.IsNullOrEmpty(allergensRaw))
-            {
-                Log.Information("Product {Code}: Raw allergens_en = [{Raw}], Parsed = [{Parsed}]",
-                    code, allergensRaw, string.Join(", ", allergens));
-            }
+            Log.Information("Product {Code}: Raw allergens_en = [{Raw}], Parsed = [{Parsed}]",
+                code, allergensRaw ?? "NULL", string.Join(", ", allergens));
+
             if (allergens.Count > 0) allergensMap[code] = allergens;
 
             var foodGroups = CsvSchema.GetList(fields, CsvSchema.Column.FoodGroupsEn);
