@@ -34,14 +34,11 @@ try
         BucketName = bucketName
     };
 
-    builder.Services.AddDbContext<DatabaseContext>(options =>
-    {
-        var connectionString = builder.Configuration["ConnectionStrings:DefaultConnection"];
-        options.UseNpgsql(connectionString);
-    });
+    var graphQLEndpoint = builder.Configuration["GraphQL:Endpoint"]
+        ?? "http://192.168.178.151:8080/graphql";
 
     builder.Services.AddSingleton(config);
-    builder.Services.AddTransient<Repository>();
+    builder.Services.AddSingleton(new GraphQL.GraphQLService(graphQLEndpoint));
 
     var host = builder.Build();
 
@@ -67,8 +64,8 @@ try
     }
 
     using var scope = host.Services.CreateScope();
-    var repository = scope.ServiceProvider.GetRequiredService<Repository>();
-    var csvController = new CsvController(repository, config);
+    var graphQLService = scope.ServiceProvider.GetRequiredService<GraphQL.GraphQLService>();
+    var csvController = new CsvController(graphQLService, config);
 
     await csvController.ProcessFileAsync(downloadedFile);
 
