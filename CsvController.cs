@@ -15,6 +15,7 @@ public class CsvController
 
     public async Task ProcessFileAsync(string filePath)
     {
+        Log.Information("Processing file: {FilePath}", filePath);
         var products = new List<ProductInput>();
         var categoriesMap = new Dictionary<decimal, List<string>>();
         var additivesMap = new Dictionary<decimal, List<string>>();
@@ -50,16 +51,18 @@ public class CsvController
             var countries = CsvSchema.GetList(fields, CsvSchema.Column.CountriesEn);
             if (countries.Count > 0) countriesMap[code] = countries;
 
-            // Debug allergens parsing
+            // Debug allergens parsing - check adjacent columns too
             var allergenColumnIndex = (int)CsvSchema.Column.AllergensEn;
-            Log.Information("Product {Code}: Field count = {Count}, Allergen column index = {Index}, Value at index = [{Value}]",
-                code, fields.Length, allergenColumnIndex,
-                allergenColumnIndex < fields.Length ? fields[allergenColumnIndex] : "OUT_OF_BOUNDS");
+            Log.Information("Product {Code}: Column 45 (allergens) = [{V45}], Column 46 (allergens_en) = [{V46}], Column 47 (traces) = [{V47}]",
+                code,
+                fields.Length > 45 ? fields[45] : "OUT_OF_BOUNDS",
+                fields.Length > 46 ? fields[46] : "OUT_OF_BOUNDS",
+                fields.Length > 47 ? fields[47] : "OUT_OF_BOUNDS");
 
             var allergensRaw = CsvSchema.Get(fields, CsvSchema.Column.AllergensEn);
             var allergens = CsvSchema.GetList(fields, CsvSchema.Column.AllergensEn);
-            Log.Information("Product {Code}: Raw allergens_en = [{Raw}], Parsed = [{Parsed}]",
-                code, allergensRaw ?? "NULL", string.Join(", ", allergens));
+            Log.Information("Product {Code}: GetList result for AllergensEn = [{Parsed}]",
+                code, string.Join(", ", allergens));
 
             if (allergens.Count > 0) allergensMap[code] = allergens;
 
