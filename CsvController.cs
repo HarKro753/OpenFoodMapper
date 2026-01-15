@@ -48,7 +48,7 @@ public class CsvController
             var allergens = CsvSchema.GetList(fields, CsvSchema.Column.AllergensEn);
             if (!string.IsNullOrEmpty(allergensRaw))
             {
-                Log.Debug("Product {Code}: Raw allergens_en = [{Raw}], Parsed = [{Parsed}]",
+                Log.Information("Product {Code}: Raw allergens_en = [{Raw}], Parsed = [{Parsed}]",
                     code, allergensRaw, string.Join(", ", allergens));
             }
             if (allergens.Count > 0) allergensMap[code] = allergens;
