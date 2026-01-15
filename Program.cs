@@ -59,7 +59,7 @@ try
 
     if (downloadedFile == null)
     {
-        Log.Error("File {FileName} not found in R2", fileName);
+        Log.Error("File {FileName} not found in Minio", fileName);
         return;
     }
 
