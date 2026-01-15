@@ -113,7 +113,10 @@ public class CsvController
     {
         foreach (var (code, names) in linksMap)
         {
-            var validNames = names.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+            var validNames = names
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Distinct()
+                .ToList();
             if (validNames.Count == 0) continue;
 
             try
