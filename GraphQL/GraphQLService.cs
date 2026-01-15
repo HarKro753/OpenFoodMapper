@@ -66,25 +66,6 @@ public class GraphQLService
         await _client.SendMutationAsync<LinkProductAdditivesResponse>(mutation, variables);
     }
 
-    public async Task LinkProductIngredientsAsync(decimal productCode, List<string> ingredientNames)
-    {
-        if (ingredientNames.Count == 0) return;
-
-        const string mutation = @"
-            mutation LinkProductIngredients($input: LinkProductIngredientsInput!) {
-                linkProductIngredients(input: $input) {
-                    success
-                }
-            }";
-
-        var variables = new
-        {
-            input = new LinkProductIngredientsInput(productCode, ingredientNames)
-        };
-
-        await _client.SendMutationAsync<LinkProductIngredientsResponse>(mutation, variables);
-    }
-
     public async Task LinkProductCountriesAsync(decimal productCode, List<string> countryNames)
     {
         if (countryNames.Count == 0) return;

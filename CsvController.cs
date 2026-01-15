@@ -18,7 +18,6 @@ public class CsvController
         var products = new List<ProductInput>();
         var categoriesMap = new Dictionary<decimal, List<string>>();
         var additivesMap = new Dictionary<decimal, List<string>>();
-        var ingredientsMap = new Dictionary<decimal, List<string>>();
         var countriesMap = new Dictionary<decimal, List<string>>();
         var allergensMap = new Dictionary<decimal, List<string>>();
         var foodGroupsMap = new Dictionary<decimal, List<string>>();
@@ -42,9 +41,6 @@ public class CsvController
             var additives = CsvSchema.GetList(fields, CsvSchema.Column.AdditivesEn);
             if (additives.Count > 0) additivesMap[code] = additives;
 
-            var ingredients = CsvSchema.GetList(fields, CsvSchema.Column.IngredientsTags);
-            if (ingredients.Count > 0) ingredientsMap[code] = ingredients;
-
             var countries = CsvSchema.GetList(fields, CsvSchema.Column.CountriesEn);
             if (countries.Count > 0) countriesMap[code] = countries;
 
@@ -59,11 +55,10 @@ public class CsvController
 
             if (products.Count >= _config.BatchSize)
             {
-                await ProcessBatchAsync(products, categoriesMap, additivesMap, ingredientsMap, countriesMap, allergensMap, foodGroupsMap, labelsMap);
+                await ProcessBatchAsync(products, categoriesMap, additivesMap, countriesMap, allergensMap, foodGroupsMap, labelsMap);
                 products.Clear();
                 categoriesMap.Clear();
                 additivesMap.Clear();
-                ingredientsMap.Clear();
                 countriesMap.Clear();
                 allergensMap.Clear();
                 foodGroupsMap.Clear();
@@ -73,7 +68,7 @@ public class CsvController
 
         if (products.Count > 0)
         {
-            await ProcessBatchAsync(products, categoriesMap, additivesMap, ingredientsMap, countriesMap, allergensMap, foodGroupsMap, labelsMap);
+            await ProcessBatchAsync(products, categoriesMap, additivesMap, countriesMap, allergensMap, foodGroupsMap, labelsMap);
         }
     }
 
@@ -81,7 +76,6 @@ public class CsvController
         List<ProductInput> products,
         Dictionary<decimal, List<string>> categoriesMap,
         Dictionary<decimal, List<string>> additivesMap,
-        Dictionary<decimal, List<string>> ingredientsMap,
         Dictionary<decimal, List<string>> countriesMap,
         Dictionary<decimal, List<string>> allergensMap,
         Dictionary<decimal, List<string>> foodGroupsMap,
@@ -99,14 +93,13 @@ public class CsvController
 
         await ProcessLinksAsync("Categories", categoriesMap, _graphQLService.LinkProductCategoriesAsync);
         await ProcessLinksAsync("Additives", additivesMap, _graphQLService.LinkProductAdditivesAsync);
-        await ProcessLinksAsync("Ingredients", ingredientsMap, _graphQLService.LinkProductIngredientsAsync);
         await ProcessLinksAsync("Countries", countriesMap, _graphQLService.LinkProductCountriesAsync);
         await ProcessLinksAsync("Allergens", allergensMap, _graphQLService.LinkProductAllergensAsync);
         await ProcessLinksAsync("FoodGroups", foodGroupsMap, _graphQLService.LinkProductFoodGroupsAsync);
         await ProcessLinksAsync("Labels", labelsMap, _graphQLService.LinkProductLabelsAsync);
 
-        Log.Information("Completed processing batch with {ProductCount} products, {CategoryCount} categories, {AdditiveCount} additives, {IngredientCount} ingredients, {CountryCount} countries, {AllergenCount} allergens, {FoodGroupCount} food groups, {LabelCount} labels",
-            products.Count, categoriesMap.Count, additivesMap.Count, ingredientsMap.Count,
+        Log.Information("Completed processing batch with {ProductCount} products, {CategoryCount} categories, {AdditiveCount} additives, {CountryCount} countries, {AllergenCount} allergens, {FoodGroupCount} food groups, {LabelCount} labels",
+            products.Count, categoriesMap.Count, additivesMap.Count, 
             countriesMap.Count, allergensMap.Count, foodGroupsMap.Count, labelsMap.Count);
     }
 
