@@ -1,5 +1,5 @@
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Information()
+    .MinimumLevel.Debug()
     .WriteTo.Console(new CompactJsonFormatter())
     .CreateLogger();
 
