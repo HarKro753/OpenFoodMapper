@@ -15,7 +15,6 @@ public class CsvController
 
     public async Task ProcessFileAsync(string filePath)
     {
-        Log.Information("Processing file: {FilePath}", filePath);
         var products = new List<ProductInput>();
         var categoriesMap = new Dictionary<decimal, List<string>>();
         var additivesMap = new Dictionary<decimal, List<string>>();
@@ -33,12 +32,6 @@ public class CsvController
             var codeStr = CsvSchema.Get(fields, CsvSchema.Column.Code);
             if (codeStr == null || !decimal.TryParse(codeStr, out var code)) continue;
 
-            // Log field count for debugging
-            if (fields.Length < 50)
-            {
-                Log.Warning("Product {Code}: Only {FieldCount} fields parsed (expected 214+)", code, fields.Length);
-            }
-
             var product = MapProductInput(fields, code);
             products.Add(product);
 
@@ -51,19 +44,7 @@ public class CsvController
             var countries = CsvSchema.GetList(fields, CsvSchema.Column.CountriesEn);
             if (countries.Count > 0) countriesMap[code] = countries;
 
-            // Debug allergens parsing - check adjacent columns too
-            var allergenColumnIndex = (int)CsvSchema.Column.AllergensEn;
-            Log.Information("Product {Code}: Column 45 (allergens) = [{V45}], Column 46 (allergens_en) = [{V46}], Column 47 (traces) = [{V47}]",
-                code,
-                fields.Length > 45 ? fields[45] : "OUT_OF_BOUNDS",
-                fields.Length > 46 ? fields[46] : "OUT_OF_BOUNDS",
-                fields.Length > 47 ? fields[47] : "OUT_OF_BOUNDS");
-
-            var allergensRaw = CsvSchema.Get(fields, CsvSchema.Column.AllergensEn);
-            var allergens = CsvSchema.GetList(fields, CsvSchema.Column.AllergensEn);
-            Log.Information("Product {Code}: GetList result for AllergensEn = [{Parsed}]",
-                code, string.Join(", ", allergens));
-
+            var allergens = CsvSchema.GetList(fields, CsvSchema.Column.Allergens);
             if (allergens.Count > 0) allergensMap[code] = allergens;
 
             var foodGroups = CsvSchema.GetList(fields, CsvSchema.Column.FoodGroupsEn);
