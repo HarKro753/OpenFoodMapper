@@ -288,3 +288,41 @@ public class CsvController
         return [.. fields];
     }
 }
+
+class Tools
+{
+    public static List<string> ParseCommaSeparatedValues(string input)
+    {
+    if (string.IsNullOrWhiteSpace(input))
+        return new List<string>();
+
+    var values = input.Split(',')
+        .Select(v => v.Trim())
+        .Where(v => !string.IsNullOrWhiteSpace(v))
+        .Where(v => !HasNonEnglishLanguagePrefix(v))
+        .Select(v => StripEnglishPrefix(v))
+        .ToList();
+
+    return values;
+    }
+
+   private static bool HasNonEnglishLanguagePrefix(string value)
+    {
+    if (value.Length < 3)
+        return false;
+
+    if (!char.IsLower(value[0]) || !char.IsLower(value[1]) || value[2] != ':')
+        return false;
+
+    return !(value[0] == 'e' && value[1] == 'n');
+    }
+
+   private static string StripEnglishPrefix(string value)
+    {
+    if (value.Length > 3 && value.StartsWith("en:"))
+        return value.Substring(3);
+
+    return value;
+    }
+}
+
