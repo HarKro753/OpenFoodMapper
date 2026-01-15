@@ -34,7 +34,7 @@ try
         BucketName = bucketName
     };
 
-    var graphQLEndpoint = builder.Configuration["GraphQL:Endpoint"]
+    var graphQLEndpoint = builder.Configuration["GraphQl:Endpoint"]
         ?? throw new InvalidOperationException("Configuration 'GraphQl:Endpoint' is missing.");
 
     builder.Services.AddSingleton(config);

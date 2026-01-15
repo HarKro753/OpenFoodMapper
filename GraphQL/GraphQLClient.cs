@@ -48,8 +48,14 @@ public class GraphQLClient
 
         if (graphQLResponse?.Errors != null && graphQLResponse.Errors.Count > 0)
         {
-            var errorMessages = string.Join(", ", graphQLResponse.Errors.Select(e => e.Message));
-            throw new Exception($"GraphQL errors: {errorMessages}");
+            var errorDetails = string.Join(", ", graphQLResponse.Errors.Select(e =>
+                $"{e.Message}" + (e.Extensions != null ? $" | Extensions: {JsonSerializer.Serialize(e.Extensions)}" : "")));
+
+            // Log the full request and response for debugging
+            Serilog.Log.Error("GraphQL Error - Request: {Request}", json);
+            Serilog.Log.Error("GraphQL Error - Response: {Response}", responseJson);
+
+            throw new Exception($"GraphQL errors: {errorDetails}");
         }
 
         return graphQLResponse?.Data;
@@ -64,5 +70,6 @@ public class GraphQLClient
     private class GraphQLError
     {
         public string Message { get; set; } = string.Empty;
+        public Dictionary<string, object>? Extensions { get; set; }
     }
 }

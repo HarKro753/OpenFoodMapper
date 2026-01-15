@@ -87,41 +87,44 @@ public class CsvController
         Dictionary<decimal, List<string>> foodGroupsMap,
         Dictionary<decimal, List<string>> labelsMap)
     {
-        await _graphQLService.UpsertProductsAsync(products);
-
-        foreach (var (code, categoryNames) in categoriesMap)
+        try
         {
-            await _graphQLService.LinkProductCategoriesAsync(code, categoryNames);
+            await _graphQLService.UpsertProductsAsync(products);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to upsert batch of {Count} products", products.Count);
+            throw;
         }
 
-        foreach (var (code, additiveNames) in additivesMap)
-        {
-            await _graphQLService.LinkProductAdditivesAsync(code, additiveNames);
-        }
+        await ProcessLinksAsync("Categories", categoriesMap, _graphQLService.LinkProductCategoriesAsync);
+        await ProcessLinksAsync("Additives", additivesMap, _graphQLService.LinkProductAdditivesAsync);
+        await ProcessLinksAsync("Ingredients", ingredientsMap, _graphQLService.LinkProductIngredientsAsync);
+        await ProcessLinksAsync("Countries", countriesMap, _graphQLService.LinkProductCountriesAsync);
+        await ProcessLinksAsync("Allergens", allergensMap, _graphQLService.LinkProductAllergensAsync);
+        await ProcessLinksAsync("FoodGroups", foodGroupsMap, _graphQLService.LinkProductFoodGroupsAsync);
+        await ProcessLinksAsync("Labels", labelsMap, _graphQLService.LinkProductLabelsAsync);
+    }
 
-        foreach (var (code, ingredientNames) in ingredientsMap)
+    private async Task ProcessLinksAsync(
+        string linkType,
+        Dictionary<decimal, List<string>> linksMap,
+        Func<decimal, List<string>, Task> linkFunction)
+    {
+        foreach (var (code, names) in linksMap)
         {
-            await _graphQLService.LinkProductIngredientsAsync(code, ingredientNames);
-        }
+            var validNames = names.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+            if (validNames.Count == 0) continue;
 
-        foreach (var (code, countryNames) in countriesMap)
-        {
-            await _graphQLService.LinkProductCountriesAsync(code, countryNames);
-        }
-
-        foreach (var (code, allergenNames) in allergensMap)
-        {
-            await _graphQLService.LinkProductAllergensAsync(code, allergenNames);
-        }
-
-        foreach (var (code, foodGroupNames) in foodGroupsMap)
-        {
-            await _graphQLService.LinkProductFoodGroupsAsync(code, foodGroupNames);
-        }
-
-        foreach (var (code, labelNames) in labelsMap)
-        {
-            await _graphQLService.LinkProductLabelsAsync(code, labelNames);
+            try
+            {
+                await linkFunction(code, validNames);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to link {LinkType} for product {ProductCode}. Names: {Names}",
+                    linkType, code, string.Join(", ", validNames.Take(5)));
+            }
         }
     }
 
