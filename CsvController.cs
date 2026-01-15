@@ -39,7 +39,7 @@ public class CsvController
             var categories = CsvSchema.GetList(fields, CsvSchema.Column.CategoriesEn);
             if (categories.Count > 0) categoriesMap[code] = categories;
 
-            var additives = CsvSchema.GetList(fields, CsvSchema.Column.AdditivesTags);
+            var additives = CsvSchema.GetList(fields, CsvSchema.Column.AdditivesEn);
             if (additives.Count > 0) additivesMap[code] = additives;
 
             var ingredients = CsvSchema.GetList(fields, CsvSchema.Column.IngredientsTags);
