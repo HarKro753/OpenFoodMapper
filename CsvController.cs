@@ -104,6 +104,10 @@ public class CsvController
         await ProcessLinksAsync("Allergens", allergensMap, _graphQLService.LinkProductAllergensAsync);
         await ProcessLinksAsync("FoodGroups", foodGroupsMap, _graphQLService.LinkProductFoodGroupsAsync);
         await ProcessLinksAsync("Labels", labelsMap, _graphQLService.LinkProductLabelsAsync);
+
+        Log.Information("Completed processing batch with {ProductCount} products, {CategoryCount} categories, {AdditiveCount} additives, {IngredientCount} ingredients, {CountryCount} countries, {AllergenCount} allergens, {FoodGroupCount} food groups, {LabelCount} labels",
+            products.Count, categoriesMap.Count, additivesMap.Count, ingredientsMap.Count,
+            countriesMap.Count, allergensMap.Count, foodGroupsMap.Count, labelsMap.Count);
     }
 
     private async Task ProcessLinksAsync(
